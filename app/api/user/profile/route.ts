@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db';
+import { connectToDB } from '@/lib/db';
 import { User } from '@/lib/models/User';
 
 export async function GET(req: Request) {
-  await connectDB();
+  await connectToDB();
 
   const userId = req.headers.get('user-id');
 

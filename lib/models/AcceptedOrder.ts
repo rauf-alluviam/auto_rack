@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 const acceptedOrderSchema = new mongoose.Schema({
-  product_name: String,
   quantity: Number,
   size: String,
   delivery_address: String,

@@ -1,15 +1,12 @@
-import mongoose, { Schema, models } from 'mongoose';
+import mongoose from 'mongoose';
 
-const trackingUpdateSchema = new Schema({
+const trackingUpdateSchema = new mongoose.Schema({
   orderId: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
     required: true,
   },
-  product_name: {
-    type: String,
-    required: true,
-  },
+ 
   delivery_address: {
     type: String,
     required: true,
@@ -20,17 +17,18 @@ const trackingUpdateSchema = new Schema({
   },
   is_accepted: {
     type: String,
-    default: 'Accepted',
+    default: 'Pending',
   },
   seller_id: {
-    type: String, // can also be ObjectId if you have a Seller model
-    required: true,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
   },
-  updated_at: {
+  created_at: {
     type: Date,
     default: Date.now,
   },
 });
 
-const TrackingUpdate = models.TrackingUpdate || mongoose.model('TrackingUpdate', trackingUpdateSchema);
+const TrackingUpdate = mongoose.models.TrackingUpdate || mongoose.model('TrackingUpdate', trackingUpdateSchema);
+
 export default TrackingUpdate;

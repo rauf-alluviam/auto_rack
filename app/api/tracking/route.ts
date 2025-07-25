@@ -9,7 +9,7 @@ export async function GET() {
     await connectToDB();
 
     const acceptedOrders = await TrackingUpdate.find({ is_accepted: 'Accepted' })
-      .populate('orderId'); // to get full order details if needed
+      .populate('orderId'); 
 
     return NextResponse.json(acceptedOrders);
   } catch (error) {

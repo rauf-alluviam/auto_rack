@@ -6,25 +6,24 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const {
-      product_name,
+      
       quantity,
       size,
       delivery_address,
-      description,
+     
     } = body;
 
-    if (!product_name || !quantity || !size || !delivery_address) {
+    if (  !quantity || !size || !delivery_address) {
       return NextResponse.json({ success: false, message: 'All required fields must be filled' }, { status: 400 });
     }
 
     await connectToDB();
 
     const newOrder = await Order.create({
-      product_name,
       quantity,
       size,
       delivery_address,
-      description,
+     
       is_accepted: false,
       estimated_delivery: '',
       order_status: 'Pending',

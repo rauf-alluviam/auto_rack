@@ -1,56 +1,39 @@
 'use client';
+
 import { useEffect, useState } from 'react';
-import { Mail, Phone, MapPin, User } from 'lucide-react';
+
+interface UserData {
+  name: string;
+  email: string;
+  password: string;
+}
 
 export default function BuyerProfile() {
-  const [userData, setUserData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-  });
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   useEffect(() => {
-    
-    const storedUser = localStorage.getItem('buyers');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
+    const stored = localStorage.getItem('signinData') || localStorage.getItem('signupData');
+    if (stored) {
+      const parsed = JSON.parse(stored);
       setUserData({
         name: parsed.name || 'N/A',
         email: parsed.email || 'N/A',
-        phone: parsed.phone || 'Not Provided',
-        address: parsed.address || 'Not Provided',
+        password: '********',
       });
     }
   }, []);
 
-  return (
-    <div className="max-w-3xl mx-auto px-6 py-12">
-      <h2 className="text-3xl font-bold mb-6">My Profile</h2>
-      
-      <div className="bg-white shadow-md rounded-lg p-6 space-y-6 border">
-        <div className="flex items-center space-x-4">
-          <User className="text-blue-600" size={32} />
-          <div>
-            <h3 className="text-xl font-semibold text-gray-800">{userData.name}</h3>
-            <p className="text-gray-500 text-sm">Registered Buyer</p>
-          </div>
-        </div>
+  if (!userData) {
+    return <p className="p-4">Loading...</p>;
+  }
 
-        <div className="space-y-3">
-          <div className="flex items-center text-gray-700">
-            <Mail className="mr-2 text-blue-500" size={20} />
-            <span>{userData.email}</span>
-          </div>
-          <div className="flex items-center text-gray-700">
-            <Phone className="mr-2 text-green-500" size={20} />
-            <span>{userData.phone}</span>
-          </div>
-          <div className="flex items-center text-gray-700">
-            <MapPin className="mr-2 text-purple-500" size={20} />
-            <span>{userData.address}</span>
-          </div>
-        </div>
+  return (
+    <div className="p-6">
+      <h1 className="text-xl font-bold mb-4">Buyer Profile</h1>
+      <div className="space-y-2">
+        <p><strong>Name:</strong> {userData.name}</p>
+        <p><strong>Email:</strong> {userData.email}</p>
+        <p><strong>Password:</strong> {userData.password}</p>
       </div>
     </div>
   );

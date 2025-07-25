@@ -8,13 +8,14 @@ export const connectToDB = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI!, {
       dbName: 'autoRack',
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      // useNewUrlParser: true,
+      // useUnifiedTopology: true,
     } as any);
 
     isConnected = true;
-    console.log('✅ MongoDB connected');
+    console.log('MongoDB connected');
   } catch (error) {
     console.error('MongoDB connection error:', error);
   }
+  
 };

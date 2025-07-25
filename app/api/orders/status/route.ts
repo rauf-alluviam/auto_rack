@@ -10,7 +10,6 @@ export async function GET() {
 
     const result = trackingData.map((item) => ({
       _id: item._id,
-      product_name: item.product_name,
       delivery_address: item.address,
       estimated_delivery: item.estimated_delivery,
       status: item.status || 'Pending',
