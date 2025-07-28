@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /api/update-status:
+ * /api/sellerOrder/updatestatus:
  *   get:
  *     summary: Fetch accepted orders with delivery status
  *     description: Retrieves orders that are accepted and have an estimated delivery or ETA. Authentication token is optional.
@@ -42,7 +42,7 @@
  *               orderId:
  *                 type: string
  *                 example: "64b7f1a5e3d531c59f8f28e1"
- *               estimated_delivery:
+ *              ETA:
  *                 type: string
  *                 format: date
  *                 example: "2025-07-28"
@@ -92,7 +92,7 @@
  *         
  *         delivery_address:
  *           type: string
- *         estimated_delivery:
+ *        ETA:
  *           type: string
  *           format: date
  *         is_accepted:
@@ -124,7 +124,6 @@ interface OrderDocument {
   customer_name?: string;
   delivery_address?: string;
   address?: string;
-  estimated_delivery?: string;
   is_accepted?: string;
   status?: string; 
   quantity?: number;
@@ -445,7 +444,7 @@ export async function POST(req: NextRequest) {
       product_name: updatedOrder.product_name || updatedOrder.size || 'Product',
       customer_name: updatedOrder.customer_name || 'Customer',
       delivery_address: updatedOrder.delivery_address || updatedOrder.address || '',
-      estimated_delivery: updatedOrder.estimated_delivery || '',
+      ETA: updatedOrder.ETA || '',
       is_accepted: status || updatedOrder.is_accepted, 
       status: status || updatedOrder.status, 
       quantity: updatedOrder.quantity || 1,

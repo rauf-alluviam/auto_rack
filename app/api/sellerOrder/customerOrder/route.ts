@@ -45,9 +45,6 @@
  *             properties:
  *               orderId:
  *                 type: string
- *               estimated_delivery:
- *                 type: string
- *                 format: date-time
  *               ETA:
  *                 type: string
  *                 format: date-time

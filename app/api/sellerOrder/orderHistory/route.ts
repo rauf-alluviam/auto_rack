@@ -1,9 +1,9 @@
 /**
  * @swagger
- * /api/order-history:
+ * /api/sellerOrder/orderHistory:
  *   get:
  *     summary: Get all delivered or accepted orders (Order History)
- *     description: Returns a list of orders that are either "Delivered" or "Accepted". Token is optional.
+ *     description: Returns a list of orders that are either "Delivered"
  *     tags:
  *       - Order History
  *     security:
@@ -29,14 +29,6 @@
  *       500:
  *         description: Server error while fetching order history
  *
- *   post:
- *     
- *     description: This endpoint does not support POST method.
- *     tags:
- *       - Order History
- *     responses:
- *       405:
- *         description: POST method not allowed
  */
 
 /**
@@ -219,13 +211,13 @@ export async function GET(req: NextRequest) {
 }
 
 
-export async function POST(req: NextRequest) {
-  return NextResponse.json({ 
-    message: "POST method not supported for order history" 
-  }, { 
-    status: 405,
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
-}
+// export async function POST(req: NextRequest) {
+//   return NextResponse.json({ 
+//     message: "POST method not supported for order history" 
+//   }, { 
+//     status: 405,
+//     headers: {
+//       'Content-Type': 'application/json'
+//     }
+//   });
+// }
