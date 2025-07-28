@@ -25,7 +25,7 @@
  *                 type: string
  *               userType:
  *                 type: string
- *                 enum: [buyer, seller]
+ *                 enum: [buyer, supplier]
  *     responses:
  *       200:
  *         description: Signup successful
@@ -56,15 +56,6 @@
  *       500:
  *         description: Server error
  */
-
-
-
-
-
-
-
-
-
 import { NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { User } from '@/lib/models/User';
@@ -72,6 +63,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
 
 export async function POST(request: Request) {
   await connectToDB();

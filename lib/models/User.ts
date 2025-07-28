@@ -4,7 +4,7 @@ const UserSchema = new Schema({
   name: { type: String, required: true },
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
-  userType: { type: String, enum: ['buyer', 'seller'], default: 'buyer', required: true },
+  userType: { type: String, enum: ['buyer', 'supplier'], default: 'buyer', required: true },
   // address: { type: String, default: "" },   
 });
 

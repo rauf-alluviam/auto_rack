@@ -30,11 +30,11 @@ export function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
     // Redirect based on role
-    if (pathname.startsWith('/dashboard/buyer/home') && decoded.role !== 'buyer') {
+    if (pathname.startsWith('buyers/home') && decoded.role !== 'buyer') {
       return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
 
-    if (pathname.startsWith('/dashboard/seller') && decoded.role !== 'seller') {
+    if (pathname.startsWith('seller') && decoded.role !== 'seller') {
       return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
 
