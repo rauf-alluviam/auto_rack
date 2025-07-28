@@ -6,6 +6,16 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET!;
 
 export function middleware(request: NextRequest) {
+  // Add CORS headers for all API routes
+  if (request.nextUrl.pathname.startsWith('/api')) {
+    const response = NextResponse.next();
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return response;
+  }
+
+  // Existing JWT logic for dashboard routes
   const token =
     request.cookies.get('token')?.value ||
     request.headers.get('Authorization')?.split(' ')[1];
@@ -37,6 +47,6 @@ export function middleware(request: NextRequest) {
 
 // Apply middleware only to dashboard routes
 export const config = {
-  matcher: ['/dashboard/:path*, /buyers/home', '/seller'],
+  matcher: ['/api/:path*', '/buyers/home', '/seller'],
 };
    
