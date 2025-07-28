@@ -7,7 +7,7 @@ const options = {
     openapi: '3.0.0',
     info: {
       title: 'My App API',
-      version: '1.0.0',
+      version: '0.9',
     },
   },
   apis: ['./app/api/**/*.ts'], // <== include all route files
