@@ -73,14 +73,15 @@ export default function SignUp() {
         }))
       }
 
-      setTimeout(() => {
-        if (userType === "buyer") {
-          router.push("/buyers/home")
-        } else if (userType === "supplier") {
-          router.push("/seller")
-        }
-      }, 1500)
+      // setTimeout(() => {
+      //   if (userType === "buyer") {
+      //     router.push("/buyers/home")
+      //   } else if (userType === "supplier") {
+      //     router.push("/seller")
+      //   }
+      // }, 1500)
 
+      router.push("/buyers/home")
     } else {
       if (res.status === 409) {
         setMessage("An account with this email already exists.")
@@ -171,7 +172,7 @@ export default function SignUp() {
               </div>
 
               {/* Role Selection */}
-              <div className="relative">
+              {/* <div className="relative">
                 <UserCheck className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <select
                   className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white appearance-none"
@@ -184,7 +185,7 @@ export default function SignUp() {
                   <option value="buyer">Buyer</option>
                   <option value="supplier">Supplier</option>
                 </select>
-              </div>
+              </div> */}
 
               {/* Password Field */}
               <div className="relative">

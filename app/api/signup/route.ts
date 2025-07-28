@@ -65,7 +65,6 @@
 
 
 
-
 import { NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { User } from '@/lib/models/User';
@@ -79,7 +78,7 @@ export async function POST(request: Request) {
 
   const { name, email, password, userType } = await request.json();
 
-  if (!name || !email || !password || !userType) {
+  if (!name || !email || !password) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
   }
 
@@ -91,11 +90,14 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Explicitly set userType to 'buyer' if not provided or undefined
+    const finalUserType = userType && userType.trim() !== '' ? userType : 'buyer';
+
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
-      userType,
+      userType: finalUserType,
     });
 
     // Generate JWT token after signup
