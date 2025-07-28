@@ -50,3 +50,5 @@
 
 //   return NextResponse.json({ message: "Change Stream is running" });
 // }
+
+export {};
