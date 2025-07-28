@@ -292,7 +292,7 @@ export default function CustomerOrderDashboard() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          {/* <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Items</p>
@@ -304,7 +304,7 @@ export default function CustomerOrderDashboard() {
                 <Package className="w-5 h-5 text-purple-600" />
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
         
         {/* Pending Approval Section */}
