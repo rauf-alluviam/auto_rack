@@ -18,6 +18,7 @@ const orderSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+ 
   delivery_address: {
     type: String,
     required: true,

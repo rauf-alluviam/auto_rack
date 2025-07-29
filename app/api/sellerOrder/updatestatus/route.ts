@@ -22,7 +22,7 @@
  *                     $ref: '#/components/schemas/OrderStatus'
  *       500:
  *         description: Server error
-
+ *
  *   post:
  *     summary: Update the status or delivery of an order
  *     description: Accepts or updates the status of an order using orderId. Optionally includes estimated_delivery.
@@ -42,13 +42,13 @@
  *               orderId:
  *                 type: string
  *                 example: "64b7f1a5e3d531c59f8f28e1"
- *              ETA:
+ *               ETA:
  *                 type: string
  *                 format: date
  *                 example: "2025-07-28"
  *               status:
  *                 type: string
- *                 enum: [In Production , Qulity Check, packaging, shipped, Delivered, Cancelled]
+ *                 enum: [In Production, Qulity Check, packaging, shipped, Delivered, Cancelled]
  *                 example: "Delivered"
  *     responses:
  *       200:
@@ -82,17 +82,15 @@
  *       type: http
  *       scheme: bearer
  *       bearerFormat: JWT
- *
  *   schemas:
  *     OrderStatus:
  *       type: object
  *       properties:
  *         _id:
  *           type: string
- *         
  *         delivery_address:
  *           type: string
- *        ETA:
+ *         ETA:
  *           type: string
  *           format: date
  *         is_accepted:
@@ -100,13 +98,14 @@
  *           enum: [Accepted, Rejected, Pending]
  *         status:
  *           type: string
- *           enum: [In Production , Qulity Check, packaging, shipped, Delivered, Cancelled]
+ *           enum: [In Production, Qulity Check, packaging, shipped, Delivered, Cancelled]
  *         quantity:
  *           type: integer
  *         updatedAt:
  *           type: string
  *           format: date
  */
+
 
 
 import { NextRequest, NextResponse } from 'next/server'

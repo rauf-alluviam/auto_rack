@@ -105,16 +105,6 @@
  *       bearerFormat: JWT
  */
 
-
-
-
-
-
-
-
-
-
-
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { connectToDB } from '@/lib/db'
@@ -142,7 +132,7 @@ export async function GET(req: NextRequest) {
 
     
     const orders = await Order.find({ buyer: userId })
-      .populate('buyer', 'name email') 
+      .populate('buyer', 'name', 'email') 
       .sort({ createdAt: -1 }) 
       .lean(); 
 
@@ -188,7 +178,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     console.log('Order request body:', body)
  
-    const { quantity, size, address, product_name } = body
+    const { quantity, size, address, product_name, } = body
     
     
     const missingFields = []
@@ -208,6 +198,7 @@ export async function POST(req: NextRequest) {
  
     const newOrder = await Order.create({
       buyer: buyerId,
+     
       quantity: parseInt(quantity),
       size,
       address,

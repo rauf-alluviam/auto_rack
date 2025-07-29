@@ -123,11 +123,6 @@
 //   }
 // }
 
-// app/api/auth/signin/route.ts
-
-// app/api/auth/signin/route.ts
-// /app/api/auth/signin/route.ts
-// /app/api/auth/signin/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { User } from '@/lib/models/User';
@@ -155,7 +150,7 @@ export async function POST(request: NextRequest) {
   const token = jwt.sign(
   { id: user._id, email: user.email, role: user.userType },
   JWT_SECRET,
-  { expiresIn: '7d' }
+  { expiresIn: '30d' }
 );
 
 return NextResponse.json({

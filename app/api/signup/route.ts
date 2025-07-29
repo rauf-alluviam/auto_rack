@@ -16,8 +16,11 @@
  *               - email
  *               - password
  *               - userType
+ *               - companyName
  *             properties:
  *               name:
+ *                 type: string
+ *               companyName:
  *                 type: string
  *               email:
  *                 type: string
@@ -45,6 +48,8 @@
  *                       type: string
  *                     name:
  *                       type: string
+ *                     companyName:
+ *                       type: string 
  *                     email:
  *                       type: string
  *                     userType:
@@ -68,9 +73,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 export async function POST(request: Request) {
   await connectToDB();
 
-  const { name, email, password, userType } = await request.json();
+  const { name, email, password, userType, companyName } = await request.json();
 
-  if (!name || !email || !password) {
+  if (!name || !email || !password || !companyName) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
   }
 
@@ -87,6 +92,7 @@ export async function POST(request: Request) {
 
     const user = await User.create({
       name,
+      companyName,
       email,
       password: hashedPassword,
       userType: finalUserType,
@@ -106,6 +112,7 @@ export async function POST(request: Request) {
         user: {
           id: user._id,
           name: user.name,
+          companyName: user.companyName,
           email: user.email,
           userType: user.userType,
         },
