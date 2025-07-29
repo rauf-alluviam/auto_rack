@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
 
     
     const orders = await Order.find({ buyer: userId })
-      .populate('buyer', 'name', 'email') 
+      .populate('buyer', 'name email') 
       .sort({ createdAt: -1 }) 
       .lean(); 
 

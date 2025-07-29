@@ -18,7 +18,8 @@ import {
   RefreshCw,
   Menu,
   X,
-  ChevronDown
+  ChevronDown,
+  Users
 } from "lucide-react"
 
 interface Order {
@@ -414,7 +415,7 @@ export default function BuyerDashboard() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
-                    Welcome back, {buyerData.name}!
+                    Welcome back
                   </h2>
                   <p className="text-sm sm:text-base text-gray-600 truncate">{buyerData.email}</p>
                   {buyerData.phone && (

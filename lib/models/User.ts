@@ -6,7 +6,7 @@ const UserSchema = new Schema({
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   userType: { type: String, enum: ['buyer', 'supplier'], default: 'buyer', required: true },
-  // address: { type: String, default: "" },   
+  // address: { type: String, default: "" },
 });
 
 // Clear existing model to avoid caching issues in development
