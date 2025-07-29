@@ -518,6 +518,7 @@ export default function CustomerOrderDashboard() {
                 </div>
               </div>
 
+
               <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
                 <h3 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Customer Information</h3>
                 <div className="space-y-1">

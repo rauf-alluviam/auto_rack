@@ -1,29 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Package, RefreshCw, AlertCircle, Search, Filter, Calendar, Home, History, ChevronDown, Menu, X } from "lucide-react"
-
-// Mock status options and config for demo
-const STATUS_OPTIONS = ["Pending", "Accepted", "Rejected", "In production", "Quality Check", "Packaging", "Shipped", "Delivered"]
-const STATUS_CONFIG = {
-  "Pending": { color: "bg-yellow-100 text-yellow-800", icon: Package },
-  "Accepted": { color: "bg-green-100 text-green-800", icon: Package },
-  "Rejected": { color: "bg-red-100 text-red-800", icon: Package },
-  "In production": { color: "bg-blue-100 text-blue-800", icon: Package },
-  "Quality Check": { color: "bg-purple-100 text-purple-800", icon: Package },
-  "Packaging": { color: "bg-indigo-100 text-indigo-800", icon: Package },
-  "Shipped": { color: "bg-cyan-100 text-cyan-800", icon: Package },
-  "Delivered": { color: "bg-teal-100 text-teal-800", icon: Package }
-}
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { color: "bg-gray-100 text-gray-800" }
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-      {status}
-    </span>
-  )
-}
+import { Package, RefreshCw, AlertCircle, Search, Filter, Calendar, ClipboardList, History, Home } from "lucide-react"
+import { STATUS_OPTIONS, STATUS_CONFIG, StatusBadge } from "@/lib/utils/order-utils" 
 
 interface Order {
   _id: string
@@ -35,14 +14,15 @@ interface Order {
   quantity: number
 }
 
-const Navigation = ({ currentPage, isMobileMenuOpen, setIsMobileMenuOpen }: { 
-  currentPage: string
-  isMobileMenuOpen: boolean
-  setIsMobileMenuOpen: (open: boolean) => void
-}) => {
+interface ApiResponse {
+  orders: Order[]
+}
+
+
+const Navigation = ({ currentPage }: { currentPage: string }) => {
   const navItems = [
     {
-      name: "Dashboard",
+      name:"Dashboard",
       href: "/seller",
       icon: Home,
       current: currentPage === "dashboard"
@@ -50,7 +30,7 @@ const Navigation = ({ currentPage, isMobileMenuOpen, setIsMobileMenuOpen }: {
     {
       name: "Order Management",
       href: "/seller/customer_order",
-      icon: Package,
+      icon: Home,
       current: currentPage === "management"
     },
     {
@@ -68,41 +48,27 @@ const Navigation = ({ currentPage, isMobileMenuOpen, setIsMobileMenuOpen }: {
   ]
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-      {/* Mobile menu button */}
-      <div className="lg:hidden p-4 border-b border-gray-200">
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-        >
-          {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          <span className="font-medium">Menu</span>
-        </button>
+    <nav className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+      <div className="flex flex-wrap gap-2">
+        {navItems.map((item) => {
+          const Icon = item.icon
+          return (
+            <a
+              key={item.name}
+              href={item.href}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                item.current
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {item.name}
+            </a>
+          )
+        })}
       </div>
-
-      {/* Navigation items */}
-      <div className={`p-4 ${isMobileMenuOpen ? 'block' : 'hidden lg:block'}`}>
-        <div className="flex flex-col lg:flex-row lg:flex-wrap gap-2">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <a
-                key={item.name}
-                href={item.href}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  item.current
-                    ? "bg-blue-600 text-white shadow-md"
-                    : "bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                }`}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span className="whitespace-nowrap">{item.name}</span>
-              </a>
-            )
-          })}
-        </div>
-      </div>
-    </div>
+    </nav>
   )
 }
 
@@ -114,36 +80,72 @@ export default function StatusUpdateDashboard() {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("All")
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  // Mock data for demo
+  // Fetch orders when component mounts
   useEffect(() => {
-    const mockOrders: Order[] = [
-      {
-        _id: "1",
-        product_name: "Wooden Crate Large",
-        customer_name: "John Doe",
-        delivery_address: "123 Main St, New York, NY 10001",
-        estimated_delivery: "2025-08-01T10:00:00Z",
-        is_accepted: "Accepted",
-        quantity: 2
-      },
-      {
-        _id: "2",
-        product_name: "Plastic Crate Medium",
-        customer_name: "Jane Smith",
-        delivery_address: "456 Oak Ave, Los Angeles, CA 90210",
-        estimated_delivery: "2025-08-02T14:30:00Z",
-        is_accepted: "In production",
-        quantity: 5
+    const fetchOrders = async () => {
+      try {
+        setLoading(true)
+        setError("")
+        
+        const res = await fetch("/api/sellerOrder/updatestatus", {
+          method: "GET",
+          headers: { 
+            "Content-Type": "application/json",
+           "Authorization": `Bearer ${localStorage.getItem('token')}`
+
+          },
+        })
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch orders: ${res.status}`)
+        }
+
+        const data: ApiResponse = await res.json()
+        console.log('Fetched orders:', data.orders)
+        
+        setOrders(data.orders || [])
+      } catch (err) {
+        console.error("Error fetching orders:", err)
+        setError(err instanceof Error ? err.message : "Failed to load orders")
+      } finally {
+        setLoading(false)
       }
-    ]
-    
-    setTimeout(() => {
-      setOrders(mockOrders)
-      setLoading(false)
-    }, 1000)
+    }
+
+    fetchOrders()
   }, [])
+
+  const handleAcceptOrder = async (orderId: string) => {
+    const estimated_delivery = "2025-07-30"
+
+    try {
+      const res = await fetch("/api/sellerOrder/updatestatus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, estimated_delivery }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        alert("Order accepted")
+        
+        const updatedOrders = orders.map((order) =>
+          order._id === orderId
+            ? { ...order, is_accepted: "Accepted", estimated_delivery }
+            : order
+        )
+        setOrders(updatedOrders)
+      } else {
+        alert("Error: " + data.message)
+      }
+    } catch (err) {
+      console.error("Error:", err)
+      alert("Failed to accept order")
+    }
+  }
+
 
   useEffect(() => {
     let filtered = orders.filter(
@@ -188,12 +190,32 @@ export default function StatusUpdateDashboard() {
 
     setUpdatingStatusId(orderId)
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      console.log("Status updated successfully")
+      const res = await fetch("/api/sellerOrder/updatestatus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, status: newIsAcceptedStatus, estimated_delivery: newEstimatedDelivery }),
+      })
+      
+      const data = await res.json()
+      
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to update status")
+      }
+      
+      console.log("Status updated successfully:", data)
     } catch (err) {
       console.error("Error updating status:", err)
       setError("Error updating status")
+      
+     
+      setOrders((prevOrders) =>
+        prevOrders.map((order) =>
+          order._id === orderId
+            ? { ...order, is_accepted: orderToUpdate.is_accepted, estimated_delivery: orderToUpdate.estimated_delivery }
+            : order,
+        ),
+      )
+      
       alert("Failed to update status. Please try again.")
     } finally {
       setUpdatingStatusId(null)
@@ -211,12 +233,20 @@ export default function StatusUpdateDashboard() {
     return stats
   }
 
+ 
   const refreshOrders = async () => {
     setLoading(true)
     try {
-      // Mock refresh
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setError("")
+      const res = await fetch("/api/sellerOrder/updatestatus", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      if (res.ok) {
+        const data: ApiResponse = await res.json()
+        setOrders(data.orders || [])
+        setError("")
+      }
     } catch (err) {
       console.error("Error refreshing orders:", err)
     } finally {
@@ -226,7 +256,7 @@ export default function StatusUpdateDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Loading orders...</p>
@@ -237,11 +267,11 @@ export default function StatusUpdateDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600 text-lg font-medium mb-2">Error Loading Orders</p>
-          <p className="text-gray-600 mb-4 text-sm">{error}</p>
+          <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={refreshOrders}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -256,24 +286,24 @@ export default function StatusUpdateDashboard() {
   const stats = getStatusStats()
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 lg:p-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Navigation */}
-        <Navigation currentPage="status" isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <Navigation currentPage="status" />
 
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
+              <div className="bg-blue-600 p-2 rounded-lg">
                 <Package className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Status Update Dashboard</h1>
-                <p className="text-gray-600 text-sm lg:text-base">Manage your order status updates</p>
+                <h1 className="text-2xl font-bold text-gray-900">Status Update Dashboard</h1>
+                <p className="text-gray-600">Manage your order status updates</p>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex items-center gap-4">
               <button
                 onClick={refreshOrders}
                 className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
@@ -281,7 +311,7 @@ export default function StatusUpdateDashboard() {
                 <RefreshCw className="w-4 h-4" />
                 Refresh
               </button>
-              <div className="text-left sm:text-right">
+              <div className="text-right">
                 <p className="text-sm text-gray-500">Total Orders</p>
                 <p className="text-2xl font-bold text-gray-900">{orders.length}</p>
               </div>
@@ -290,21 +320,21 @@ export default function StatusUpdateDashboard() {
         </div>
 
         {/* Status Overview Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 lg:gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
           {STATUS_OPTIONS.filter((status) => status !== "Pending" && status !== "Rejected").map((status) => {
             const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]
             const Icon = config?.icon || Package
             const count = stats[status] || 0
 
             return (
-              <div key={status} className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 lg:p-4">
+              <div key={status} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className={`p-1.5 rounded-lg ${config?.color.split(" ")[0] || "bg-gray-100"}`}>
-                    <Icon className={`w-3 h-3 lg:w-4 lg:h-4 ${config?.color.split(" ")[1] || "text-gray-600"}`} />
+                    <Icon className={`w-4 h-4 ${config?.color.split(" ")[1] || "text-gray-600"}`} />
                   </div>
-                  <span className="text-lg lg:text-xl font-bold text-gray-900">{count}</span>
+                  <span className="text-xl font-bold text-gray-900">{count}</span>
                 </div>
-                <p className="text-xs text-gray-600 truncate" title={status}>{status}</p>
+                <p className="text-xs text-gray-600 truncate">{status}</p>
               </div>
             )
           })}
@@ -312,42 +342,38 @@ export default function StatusUpdateDashboard() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search orders..."
+                placeholder="Search orders by product, customer, or address..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              <div className="relative">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="appearance-none border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-base"
-                >
-                  <option value="All">All Status</option>
-                  {STATUS_OPTIONS.filter((status) => status !== "Pending" && status !== "Rejected").map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
-              </div>
+              <Filter className="w-4 h-4 text-gray-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="All">All Status</option>
+                {STATUS_OPTIONS.filter((status) => status !== "Pending" && status !== "Rejected").map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
 
-        {/* Orders Table/Cards */}
+        {/* Orders Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {/* Desktop Table */}
-          <div className="hidden lg:block overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -387,23 +413,20 @@ export default function StatusUpdateDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col items-start gap-2">
-                        <div className="relative">
-                          <select
-                            value={order.is_accepted}
-                            disabled={updatingStatusId === order._id}
-                            onChange={(e) => handleStatusChange(order._id, e.target.value, order.estimated_delivery)}
-                            className="appearance-none border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 bg-white"
-                          >
-                            {STATUS_OPTIONS.filter((status) => status !== "Pending" && status !== "Rejected" ).map(
-                              (status) => (
-                                <option key={status} value={status}>
-                                  {status}
-                                </option>
-                              ),
-                            )}
-                          </select>
-                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
-                        </div>
+                        <select
+                          value={order.is_accepted}
+                          disabled={updatingStatusId === order._id}
+                          onChange={(e) => handleStatusChange(order._id, e.target.value, order.estimated_delivery)}
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                        >
+                          {STATUS_OPTIONS.filter((status) => status !== "Pending" && status !== "Rejected" ).map(
+                            (status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ),
+                          )}
+                        </select>
                         {updatingStatusId === order._id && <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />}
                         <StatusBadge status={order.is_accepted} />
                       </div>
@@ -413,7 +436,7 @@ export default function StatusUpdateDashboard() {
                         <Calendar className="w-4 h-4 text-gray-400" />
                         <input
                           type="datetime-local"
-                          value={order.estimated_delivery ? new Date(order.estimated_delivery).toISOString().slice(0, 16) : ""}
+                          value={order.estimated_delivery || ""}
                           onChange={(e) => {
                             const newEstimatedDelivery = e.target.value
                             const updatedOrders = orders.map((o) =>
@@ -431,81 +454,16 @@ export default function StatusUpdateDashboard() {
               </tbody>
             </table>
           </div>
-
-          {/* Mobile Cards */}
-          <div className="lg:hidden">
-            {filteredOrders.map((order, index) => (
-              <div key={`${order._id}-${index}`} className="p-4 border-b border-gray-200 last:border-b-0">
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-gray-100 p-2 rounded-lg flex-shrink-0">
-                      <Package className="w-4 h-4 text-gray-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900 mb-1">{order.product_name}</div>
-                      <div className="text-sm text-gray-600 truncate">{order.delivery_address}</div>
-                      <div className="text-sm text-gray-600 mt-1">Quantity: {order.quantity || 0}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                      <div className="relative">
-                        <select
-                          value={order.is_accepted}
-                          disabled={updatingStatusId === order._id}
-                          onChange={(e) => handleStatusChange(order._id, e.target.value, order.estimated_delivery)}
-                          className="w-full appearance-none border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 bg-white"
-                        >
-                          {STATUS_OPTIONS.filter((status) => status !== "Pending" && status !== "Rejected" ).map(
-                            (status) => (
-                              <option key={status} value={status}>
-                                {status}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <StatusBadge status={order.is_accepted} />
-                        {updatingStatusId === order._id && <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Estimated Delivery</label>
-                      <input
-                        type="datetime-local"
-                        value={order.estimated_delivery ? new Date(order.estimated_delivery).toISOString().slice(0, 16) : ""}
-                        onChange={(e) => {
-                          const newEstimatedDelivery = e.target.value
-                          const updatedOrders = orders.map((o) =>
-                            o._id === order._id ? { ...o, estimated_delivery: newEstimatedDelivery } : o,
-                          )
-                          setOrders(updatedOrders)
-                          handleStatusChange(order._id, order.is_accepted, newEstimatedDelivery)
-                        }}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
           {filteredOrders.length === 0 && (
-            <div className="text-center py-12 px-4">
+            <div className="text-center py-12">
               <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 {searchTerm || statusFilter !== "All" ? "No matching orders" : "No orders found"}
               </h3>
-              <p className="text-gray-500 text-sm max-w-md mx-auto">
+              <p className="text-gray-500">
                 {searchTerm || statusFilter !== "All"
                   ? "Try adjusting your search or filter criteria."
-                  : "Orders will appear here once they are no longer 'Pending' and have an estimated delivery time set."}
+                  : "Orders will appear here once they are no longer 'Pending' and have an estimated delivery time set. Orders marked as 'Delivered' are automatically removed from this view."}
               </p>
             </div>
           )}

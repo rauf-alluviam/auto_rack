@@ -69,6 +69,8 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/;
 
 export async function POST(request: Request) {
   await connectToDB();
@@ -79,6 +81,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
   }
 
+
+  if (!emailRegex.test(email)) {
+    return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+  }
+
+  if (!passwordRegex.test(password)) {
+    return NextResponse.json(
+      {
+        error:
+          'Password must be at least 8 characters long and include uppercase, lowercase, and a number',
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -87,7 +104,6 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Explicitly set userType to 'buyer' if not provided or undefined
     const finalUserType = userType && userType.trim() !== '' ? userType : 'buyer';
 
     const user = await User.create({
@@ -98,7 +114,6 @@ export async function POST(request: Request) {
       userType: finalUserType,
     });
 
-    // Generate JWT token after signup
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.userType },
       JWT_SECRET,
@@ -108,7 +123,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         message: 'Signup successful',
-        token, 
+        token,
         user: {
           id: user._id,
           name: user.name,
@@ -116,7 +131,7 @@ export async function POST(request: Request) {
           email: user.email,
           userType: user.userType,
         },
-        userId: user._id 
+        userId: user._id,
       },
       { status: 200 }
     );
