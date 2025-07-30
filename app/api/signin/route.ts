@@ -131,9 +131,22 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret';
 
+
+const emailRegex = /^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
+
+    
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+    }
+
+   
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+    }
 
     await connectToDB();
     const user = await User.findOne({ email });
@@ -147,30 +160,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-  const token = jwt.sign(
-  { id: user._id, email: user.email, role: user.userType },
-  JWT_SECRET,
-  { expiresIn: '30d' }
-);
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.userType },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
 
-return NextResponse.json({
-  token,
-  role: user.userType,
-  user: {
-    id: user._id,
-    name: user.name,
-    email: user.email,
-    userType: user.userType,
-    // address: user.address
-  }
-});
+    return NextResponse.json({
+      token,
+      role: user.userType,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        userType: user.userType,
+      }
+    });
 
   } catch (err) {
-    console.error(err);
+    console.error('Login Error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
-
-
-
-

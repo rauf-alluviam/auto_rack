@@ -18,115 +18,139 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({
+  name: false,
+  email: false,
+  password: false,
+  confirmPassword: false,
+  companyName: false,
+});
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    
-    // Quick validation before showing loading state
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?#&^()\-_=+{}[\]|\\:;"'<>,./])[A-Za-z\d@$!%*?#&^()\-_=+{}[\]|\\:;"'<>,./]{8,}$/
+const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault()
 
-    if (!name.trim()) {
-      setMessage("Please enter your name.")
-      return
+const emailRegex = /^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?#&^()\-_=+{}[\]|\\:;"'<>,./])[A-Za-z\d@$!%*?#&^()\-_=+{}[\]|\\:;"'<>,./]{8,}$/
+  const nameRegex = /^[A-Za-z ]+$/
+
+  if (!name.trim()) {
+    setMessage("Please enter your name.")
+    setFieldErrors(prev => ({ ...prev, name: true }))
+    return
+  }
+
+  if (!nameRegex.test(name.trim())) {
+    setMessage("Full Name can only contain alphabets and spaces.")
+    setFieldErrors(prev => ({ ...prev, name: true }))
+    return
+  }
+
+  if (!CompanyName.trim()) {
+    setMessage("Please enter your Company Name.")
+    setFieldErrors(prev => ({ ...prev, companyName: true }))
+    return
+  }
+
+if (!email.trim()) {
+  setMessage("Please enter your email.");
+  setFieldErrors(prev => ({ ...prev, email: true }));
+  return;
+}
+
+if (!emailRegex.test(email)) {
+  setMessage("Please enter a valid email address.");
+  setFieldErrors(prev => ({ ...prev, email: true }));
+  return;
+}
+
+  if (!passwordRegex.test(password)) {
+    setMessage("Password must be at least 8 characters long, include uppercase, lowercase, number, and special character.")
+    setFieldErrors(prev => ({ ...prev, password: true }))
+    return
+  }
+
+  if (password !== confirmPassword) {
+    setMessage("Passwords do not match.")
+    setFieldErrors(prev => ({ ...prev, confirmPassword: true }))
+    return
+  }
+
+ 
+  setIsLoading(true)
+  setMessage("")
+
+  const userData = {
+    name: name.trim(),
+    companyName: CompanyName.trim(),
+    email: email.trim().toLowerCase(),
+    password: password.trim(),
+    confirmPassword: confirmPassword.trim(),
+    userType: userType || "buyer"
+  }
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+    const res = await fetch("/api/signup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(userData),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: "Network error occurred" }))
+      throw new Error(errorData.error || errorData.message || `HTTP ${res.status}`)
     }
-    if (!CompanyName.trim()) {
-      setMessage("Please enter your Company Name.")
-      return
-    }
-    if (!emailRegex.test(email)) {
-      setMessage("Please enter a valid email address.")
-      return
-    }
 
-    if (!passwordRegex.test(password)) {
-      setMessage("Password must be at least 8 characters long, include uppercase, lowercase, number, and special character.")
-      return
-    }
+    const data = await res.json()
 
-    if (password !== confirmPassword) {
-      setMessage("Passwords do not match")
-      return
-    }
-
-    // Only set loading after validation passes
-    setIsLoading(true)
-    setMessage("")
-
-    const userData = { 
-      name: name.trim(), 
-      companyName: CompanyName.trim(),
-      email: email.trim().toLowerCase(), 
-      password: password.trim(), 
-      userType: userType || "buyer" 
-    }
-
-    try {
-      // Add timeout to prevent hanging requests
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
-
-      const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify(userData),
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: "Network error occurred" }))
-        throw new Error(errorData.error || errorData.message || `HTTP ${res.status}`)
-      }
-
-      const data = await res.json()
-      
-      // Batch localStorage operations
-      if (typeof window !== 'undefined' && data.token) {
-        const storageData = {
-          token: data.token,
-          buyerId: data.user?.id,
-          signupData: JSON.stringify({
-            name: name.trim(),
-            companyName: CompanyName.trim(),
-            email: email.trim().toLowerCase(),
-            userType: userType || "buyer",
-            userId: data.user?.id
-          })
-        }
-        
-        Object.entries(storageData).forEach(([key, value]) => {
-          if (value) localStorage.setItem(key, value)
+    if (typeof window !== 'undefined' && data.token) {
+      const storageData = {
+        token: data.token,
+        buyerId: data.user?.id,
+        signupData: JSON.stringify({
+          name: name.trim(),
+          companyName: CompanyName.trim(),
+          email: email.trim().toLowerCase(),
+          userType: userType || "buyer",
+          userId: data.user?.id
         })
       }
 
-      setMessage("Account created successfully! Redirecting...")
-      
-      // Immediate redirect without delay
-      router.push("/buyers/home")
-      
-    } catch (error: any) {
-      console.error("Signup error:", error)
-      
-      if (error.name === 'AbortError') {
-        setMessage("Request timeout. Please check your connection and try again.")
-      } else if (error.message.includes('409') || error.message.includes('exists')) {
-        setMessage("An account with this email already exists.")
-      } else if (error.message.includes('400') || error.message.includes('validation')) {
-        setMessage("Please fill in all required fields correctly.")
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        setMessage("Network error. Please check your connection and try again.")
-      } else {
-        setMessage(error.message || "Signup failed. Please try again.")
-      }
-    } finally {
-      setIsLoading(false)
+      Object.entries(storageData).forEach(([key, value]) => {
+        if (value) localStorage.setItem(key, value)
+      })
     }
+
+    setMessage("Account created successfully! Redirecting...")
+    router.push("/buyers/home")
+
+  } catch (error: any) {
+    console.error("Signup error:", error)
+
+    if (error.name === 'AbortError') {
+      setMessage("Request timeout. Please check your connection and try again.")
+    } else if (error.message.includes('409') || error.message.includes('exists')) {
+      setMessage("An account with this email already exists.")
+    } else if (error.message.includes('400') || error.message.includes('validation')) {
+      setMessage("Please fill in all required fields correctly.")
+    } else if (error.message.includes('network') || error.message.includes('fetch')) {
+      setMessage("Network error. Please check your connection and try again.")
+    } else {
+      setMessage(error.message || "Signup failed. Please try again.")
+    }
+  } finally {
+    setIsLoading(false)
   }
+}
+
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-3 sm:p-4 md:p-6">
@@ -157,7 +181,7 @@ export default function SignUp() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4 sm:space-y-5">
               {message && (
                 <div
                   className={`p-3 sm:p-4 rounded-lg sm:rounded-xl text-xs sm:text-sm flex items-start gap-2 ${
@@ -180,7 +204,7 @@ export default function SignUp() {
                   className="w-full pl-10 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm sm:text-base"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  required
+                 
                   disabled={isLoading}
                 />
               </div>
@@ -194,7 +218,7 @@ export default function SignUp() {
                   className="w-full pl-10 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm sm:text-base"
                   value={CompanyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  required
+                
                   disabled={isLoading}
                 />
               </div>
@@ -208,7 +232,7 @@ export default function SignUp() {
                   className="w-full pl-10 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm sm:text-base"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
+                  
                   disabled={isLoading}
                 />
               </div>
@@ -222,7 +246,6 @@ export default function SignUp() {
                   className="w-full pl-10 sm:pl-11 pr-10 sm:pr-12 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm sm:text-base"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
                   disabled={isLoading}
                 />
                 <button

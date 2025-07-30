@@ -39,15 +39,18 @@ export default function SignInPage() {
     const emailTrimmed = email.trim().toLowerCase()
     const passwordTrimmed = password.trim()
 
-    if (!emailTrimmed || !passwordTrimmed) {
-      setMessage("Please fill in all fields");
-      return;
-    }
+   const emailRegex = /^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
-      setMessage("Please enter a valid email address");
-      return;
-    }
+if (!emailTrimmed || !passwordTrimmed) {
+  setMessage("Please fill in all fields");
+  return;
+}
+
+if (!emailRegex.test(emailTrimmed)) {
+  setMessage("Please enter a valid email address");
+  return;
+}
+
 
     // Only set loading after validation passes
     setIsLoading(true);
@@ -80,12 +83,12 @@ export default function SignInPage() {
 
       const data = await res.json();
 
-      // Fast token storage
+      
       if (data.token) {
         localStorage.setItem("token", data.token);
       }
       
-      // Determine user role quickly
+     
       let userRole = data.user?.userType?.toLowerCase() || data.user?.role?.toLowerCase()
       
       if (!userRole && data.token) {
@@ -94,7 +97,7 @@ export default function SignInPage() {
           userRole = (decoded.userType || decoded.role)?.toLowerCase();
         } catch (decodeError) {
           console.warn("Token decode failed:", decodeError);
-          userRole = "buyer"; // fallback
+          userRole = "buyer"; 
         }
       }
 
@@ -108,7 +111,7 @@ export default function SignInPage() {
         address: data.user?.address,
       };
 
-      // Fast redirect based on role
+     
       if (userRole === 'supplier' || userRole === 'seller') {
         localStorage.setItem("supplier", JSON.stringify(userData));
         router.push("/seller");
@@ -166,7 +169,7 @@ export default function SignInPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
+            <form onSubmit={handleLogin}  noValidate className="space-y-4 sm:space-y-5">
               {message && (
                 <div className="p-3 sm:p-4 rounded-lg sm:rounded-xl text-xs sm:text-sm flex items-start gap-2 bg-red-50 border border-red-200 text-red-700">
                   <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
