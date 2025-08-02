@@ -80,47 +80,49 @@ if (!emailRegex.test(emailTrimmed)) {
         const errorData = await res.json().catch(() => ({ error: "Network error occurred" }))
         throw new Error(errorData.message || errorData.error || `HTTP ${res.status}`)
       }
+const data = await res.json();
 
-      const data = await res.json();
+let userRole = data.user?.userType?.toLowerCase() || data.user?.role?.toLowerCase();
 
-      
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-      }
-      
-     
-      let userRole = data.user?.userType?.toLowerCase() || data.user?.role?.toLowerCase()
-      
-      if (!userRole && data.token) {
-        try {
-          const decoded = jwtDecode<DecodedToken>(data.token);
-          userRole = (decoded.userType || decoded.role)?.toLowerCase();
-        } catch (decodeError) {
-          console.warn("Token decode failed:", decodeError);
-          userRole = "buyer"; 
-        }
-      }
+if (!userRole && data.token) {
+  try {
+    const decoded = jwtDecode<DecodedToken>(data.token);
+    userRole = (decoded.userType || decoded.role)?.toLowerCase();
+  } catch (decodeError) {
+    console.warn("Token decode failed:", decodeError);
+    userRole = "buyer"; 
+  }
+}
 
-      // Prepare user data for storage
-      const userData = {
-        id: data.user?.id,
-        name: data.user?.name,
-        email: data.user?.email,
-        role: userRole,
-        userType: userRole,
-        address: data.user?.address,
-      };
+// ✅ Store token based on user role
+if (data.token) {
+  if (userRole === 'supplier' || userRole === 'seller') {
+    localStorage.setItem("seller_token", data.token);
+  } else if (userRole === 'buyer' || !userRole) {
+    localStorage.setItem("buyer_token", data.token);
+  }
+}
 
-     
-      if (userRole === 'supplier' || userRole === 'seller') {
-        localStorage.setItem("supplier", JSON.stringify(userData));
-        router.push("/seller");
-      } else if (userRole === 'buyer' || !userRole) {
-        localStorage.setItem("buyer", JSON.stringify(userData));
-        router.push("/buyers/home");
-      } else {
-        throw new Error(`Unknown user role: ${userRole}`)
-      }
+// ✅ Store user object
+const userData = {
+  id: data.user?.id,
+  name: data.user?.name,
+  email: data.user?.email,
+  role: userRole,
+  userType: userRole,
+  address: data.user?.address,
+};
+
+if (userRole === 'supplier' || userRole === 'seller') {
+  localStorage.setItem("supplier", JSON.stringify(userData));
+  router.push("/seller");
+} else if (userRole === 'buyer' || !userRole) {
+  localStorage.setItem("buyer", JSON.stringify(userData));
+  router.push("/buyers/home");
+} else {
+  throw new Error(`Unknown user role: ${userRole}`);
+}
+
 
     } catch (error: any) {
       console.error("Login error:", error);

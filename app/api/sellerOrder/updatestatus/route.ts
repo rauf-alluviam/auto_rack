@@ -339,8 +339,7 @@ export async function POST(req: NextRequest) {
 
     const mapStatusToDbValue = (frontendStatus: string): string => {
       const statusMapping: { [key: string]: string } = {
-        'Cancelled': 'Rejected', 
-        'Canceled': 'Rejected',  
+        'Cancelled': 'Rejected',   
         'Processing': 'Processing',
         'Shipped': 'Shipped', 
         'Out for Delivery': 'Out for Delivery',

@@ -109,6 +109,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { connectToDB } from '@/lib/db'
 import { Order } from '@/lib/models/order'
+import { User } from '@/lib/models/User';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 

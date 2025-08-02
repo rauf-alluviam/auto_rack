@@ -1,17 +1,22 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
+console.log(" User model loaded");
 
-const UserSchema = new Schema({
-  name: { type: String, required: true },
-  companyName: { type: String, required: true },
-  email: { type: String, unique: true, required: true },
-  password: { type: String, required: true },
-  userType: { type: String, enum: ['buyer', 'supplier'], default: 'buyer', required: true },
-  // address: { type: String, default: "" },
-});
-
-// Clear existing model to avoid caching issues in development
-if (mongoose.models.User) {
-  delete mongoose.models.User;
+export interface IUser extends Document {
+  name: string;
+  companyName: string;
+  email: string;
+  password: string;
+  userType: 'buyer' | 'supplier';
 }
 
-export const User = mongoose.model('User', UserSchema);
+const UserSchema = new Schema<IUser>({
+  name: { type: String, required: true },
+  companyName: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  userType: { type: String, enum: ['buyer', 'supplier'], default: 'buyer', required: true },
+});
+
+// ✅ This ensures the model is not re-registered in dev mode (prevents MissingSchemaError)
+export const User: Model<IUser> =
+  mongoose.models.User || mongoose.model<IUser>('User', UserSchema);

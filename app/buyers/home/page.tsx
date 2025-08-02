@@ -1,6 +1,6 @@
 "use client"
 import { useRouter } from "next/navigation"
-
+import { io } from 'socket.io-client';
 import { useState, useEffect } from "react"
 import {
   ShoppingCart,
@@ -56,7 +56,17 @@ export default function BuyerDashboard() {
   const [token, setToken] = useState<string | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
 
-  
+    
+
+// Toast state for notifications
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: 'Order is Accepted', visible: false });
+
+  // Show toast for 3 seconds
+  const showToast = (message: string) => {
+    setToast({ message, visible: true });
+    setTimeout(() => setToast({ message: '', visible: false }), 3000);
+  };
+
     
   const router = useRouter();
 
@@ -103,7 +113,7 @@ export default function BuyerDashboard() {
   useEffect(() => {
     const checkAuth = () => {
       setLoadingUser(true)
-      const storedToken = localStorage.getItem("token")
+     const storedToken = localStorage.getItem("buyer_token"); 
       if (!storedToken) {
         console.log("No token found. Redirecting to signin...")
         navigateToSignin()
@@ -195,6 +205,69 @@ export default function BuyerDashboard() {
     }
   }, [buyerData?._id, token, authChecked])
 
+
+
+
+
+useEffect(() => {
+  if (!buyerData?._id) return;
+
+  const socket = io('http://localhost:3000', {
+    path: '/socket.io',
+    transports: ['websocket'],
+  });
+
+  socket.on('connect', () => {
+    console.log('Socket connected (buyer)', socket.id);
+    socket.emit('register', { userId: buyerData._id, role: 'buyer' });
+  });
+
+  socket.on('orderUpdated', (update) => {
+    console.log('Received orderUpdated event (buyer)', update);
+
+    // Show toast notification
+    showToast(`Order status updated to ${update.is_accepted}`);
+    
+    // Refresh orders to ensure we have the latest data
+    refreshOrders();
+    
+  });
+
+  // Helper function to refresh orders
+  const refreshOrders = async () => {
+    if (!token) return;
+    
+    try {
+    const buyerToken = localStorage.getItem("buyer_token");
+      const res = await fetch(`/api/orders`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${buyerToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data.orders || []);
+        console.log('Orders refreshed after socket update');
+      }
+    } catch (error) {
+      console.error("Error refreshing orders:", error);
+    }
+  };
+
+  socket.on('connect_error', (err) => {
+    console.error('Socket connection error (buyer):', err);
+  });
+
+  return () => {
+    socket.disconnect();
+  };
+}, [buyerData?._id, token]); // Add token to dependencies
+
+
+
   const handleLogout = () => {
     localStorage.clear()
     setBuyerData(null)
@@ -228,6 +301,8 @@ export default function BuyerDashboard() {
   }
 
   const formatStatus = (status: Order["is_accepted"]) => status
+
+ 
 
   // Close mobile menu on window resize
   useEffect(() => {
@@ -302,6 +377,31 @@ export default function BuyerDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/20">
+
+      {/* Enhanced Toast Notification */}
+      {toast.visible && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-2 duration-300">
+          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-300">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                  <Bell className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium">{toast.message}</p>
+              </div>
+              <button
+                onClick={() => setToast({ message: '', visible: false })}
+                className="ml-3 text-white/80 hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white/90 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
@@ -484,6 +584,31 @@ export default function BuyerDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Enhanced Toast Notification */}
+            {toast.visible && (
+              <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-2 duration-300">
+                <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-300">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                        <Bell className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <p className="text-sm font-medium">{toast.message}</p>
+                    </div>
+                    <button
+                      onClick={() => setToast({ message: '', visible: false })}
+                      className="ml-3 text-white/80 hover:text-white transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
 
             {/* Orders List */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200">

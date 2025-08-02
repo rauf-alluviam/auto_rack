@@ -1,7 +1,7 @@
 "use client"
-
+import { io } from 'socket.io-client';
 import { useEffect, useState } from "react"
-import { Package, Calendar, MapPin, CheckCircle, Clock, User, Eye, Home, History } from "lucide-react"
+import { Package, Calendar, MapPin, CheckCircle, Clock, User, Eye, Home, History,Bell ,X} from "lucide-react"
 import { Order } from "@/lib/models/order"
 
 interface Order {
@@ -16,6 +16,7 @@ interface Order {
   size: string
 }
 
+ 
 // Navigation Component
 const Navigation = ({ currentPage }: { currentPage: string }) => {
   const navItems = [
@@ -106,6 +107,23 @@ export default function CustomerOrderDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
+  const socket = io("http://localhost:3000", {
+  path: "/socket.io",
+  transports: ["websocket"],
+});
+ // Toast state for notifications
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+
+  // Show toast for 3 seconds
+  const showToast = (message: string) => {
+    setToast({ message, visible: true });
+    setTimeout(() => setToast({ message: '', visible: false }), 3000);
+  };
+
+  const [showAllPending, setShowAllPending] = useState<boolean>(false)
+const [showAllAccepted, setShowAllAccepted] = useState<boolean>(false)
+const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
+  
   const fetchOrders = async () => {
     try {
       const token = localStorage.getItem("token") 
@@ -154,6 +172,42 @@ export default function CustomerOrderDashboard() {
       year: "numeric",
     });
   };
+  
+
+  useEffect(() => {
+    const seller = typeof window !== 'undefined' ? localStorage.getItem('supplier') : null;
+    let sellerId = '';
+    if (seller) {
+      try {
+        const parsed = JSON.parse(seller);
+        sellerId = parsed._id || parsed.id || '';
+      } catch (e) { console.warn('Failed to parse supplier from localStorage', e); }
+    }
+    if (!sellerId) {
+      showToast('Seller ID not found. Real-time updates will not work.');
+      return;
+    }
+    const socket = io({ path: '/socket.io' });
+    socket.on('connect', () => {
+      console.log('Socket connected', socket.id);
+      socket.emit('register', { userId: sellerId, role: 'seller' });
+    });
+    socket.on('orderPlaced', (order) => {
+      console.log('Received orderPlaced event', order);
+      showToast('New order received!');
+      fetchOrders();
+    });
+    socket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err);
+      showToast('Socket connection error');
+    });
+    return () => { socket.disconnect(); };
+  }, []);
+
+  useEffect(() => {
+    // Test toast on every page load
+    showToast('Toast test: page loaded');
+  }, []);
 
   const handleChange = (index: number, field: keyof Order, value: string) => {
     const updatedOrders = [...orders]
@@ -226,6 +280,30 @@ export default function CustomerOrderDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-4 lg:p-6">
       <div className="max-w-7xl mx-auto">
+        
+              {/* Enhanced Toast Notification */}
+              {toast.visible && (
+                <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-2 duration-300">
+                  <div className="bg-gradient-to-r from-blue-500 to-green-600 text-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-300">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                          <Bell className="h-4 w-4" />
+                        </div>
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <p className="text-sm font-medium">{toast.message}</p>
+                      </div>
+                      <button
+                        onClick={() => setToast({ message: 'New Order', visible: true })}
+                        className="ml-3 text-white/80 hover:text-white transition-colors"
+                      >
+                         <X className="h-4 w-4" /> 
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
         {/* Navigation */}
         <Navigation currentPage="management" />
 
@@ -303,90 +381,78 @@ export default function CustomerOrderDashboard() {
               </div>
             </div>
             <div className="space-y-3 sm:space-y-4">
-              {pendingOrders.map((order, index) => {
-                const originalIndex = orders.findIndex((o) => o._id === order._id)
-                return (
-                  <div key={order._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 border-l-4 border-l-yellow-400">
-                    <div className="space-y-4">
-                      {/* Order Header */}
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-yellow-100 p-2 rounded-lg">
-                            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-gray-900 text-sm sm:text-base">{order.customer_name}</h3>
-                            <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-500 mt-1">
-                              <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span>Ordered: {formatDate(order.order_date)}</span>
+              {(showAllPending ? pendingOrders : pendingOrders.slice(0, ORDERS_TO_SHOW)).map((order: Order, index: number) => {
+                      const originalIndex = orders.findIndex((o) => o._id === order._id)
+                      return (
+                        <div key={order._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 border-l-4 border-l-yellow-400">
+                          <div className="flex items-center justify-between gap-3">
+                            {/* Left side - Order info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="bg-yellow-100 p-1.5 rounded">
+                                  <Clock className="w-3 h-3 text-yellow-600" />
+                                </div>
+                                <h3 className="font-medium text-gray-900 text-sm truncate">{order.customer_name}</h3>
+                                <span className="text-xs text-gray-500">({formatDate(order.order_date)})</span>
+                              </div>
+                              <p className="text-xs text-gray-600 truncate mb-1">{order.product_name} • Qty: {order.quantity} • Size: {order.size}</p>
+                              <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">{order.delivery_address}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="date"
+                                  value={formatDateForDateInput(order.ETA)}
+                                  onChange={(e) => handleChange(originalIndex, "ETA", e.target.value)}
+                                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
+                                />
+                              </div>
+                            </div>
+                            
+                            {/* Right side - Actions */}
+                            <div className="flex flex-col gap-1">
+                              <button
+                                onClick={() => setSelectedOrder(order)}
+                                className="inline-flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium transition-colors"
+                              >
+                                <Eye className="w-3 h-3" />
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleApprove(originalIndex)}
+                                disabled={loadingId === order._id || !order.ETA || order.ETA.trim() === ""}
+                                className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {loadingId === order._id ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-2 w-2 border border-white border-t-transparent"></div>
+                                    Accept
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-3 h-3" />
+                                    Accept
+                                  </>
+                                )}
+                              </button>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      )
+                    })}
+              {pendingOrders.length > ORDERS_TO_SHOW && (
+              <div className="text-center pt-4">
+                <button
+                  onClick={() => setShowAllPending(!showAllPending)}
+                  className="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  {showAllPending ? 'Show Less' : `Show More (${pendingOrders.length - ORDERS_TO_SHOW} more)`}
+                </button>
+              </div>
+            )}
 
-                      {/* Order Details */}
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-gray-500">
-                          <span>{order.product_name} (Qty: {order.quantity}, Size: {order.size})</span>
-                        </div>
-                        <div className="flex items-start gap-1 text-xs sm:text-sm text-gray-500">
-                          <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0" />
-                          <span className="break-words">{order.delivery_address}</span>
-                        </div>
-                      </div>
 
-                      {/* Delivery Date Input */}
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
-                          <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
-                          <label htmlFor={`estimated-delivery-${order._id}`} className="font-medium">
-                            Estimated Delivery:
-                          </label>
-                        </div>
-                        <input
-                          id={`estimated-delivery-${order._id}`}
-                          type="date"
-                          value={formatDateForDateInput(order.ETA)}
-                          onChange={(e) => handleChange(originalIndex, "ETA", e.target.value)}
-                          className="border border-gray-300 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-auto"
-                        />
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="inline-flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
-                        >
-                          <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                          View Details
-                        </button>
-                        <button
-                          onClick={() => handleApprove(originalIndex)}
-                          disabled={
-                            loadingId === order._id ||
-                            !order.ETA ||
-                            order.ETA.trim() === ""
-                          }
-                          className="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {loadingId === order._id ? (
-                            <>
-                              <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-2 border-white border-t-transparent"></div>
-                              Accepting...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                              Accept Order
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
             </div>
           </div>
         )}
@@ -406,70 +472,66 @@ export default function CustomerOrderDashboard() {
               </div>
             </div>
             <div className="space-y-3 sm:space-y-4">
-              {acceptedOrders.map((order, index) => {
-                const originalIndex = orders.findIndex((o) => o._id === order._id)
-                return (
-                  <div key={order._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 border-l-4 border-l-green-400">
-                    <div className="space-y-4">
-                      {/* Order Header */}
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-green-100 p-2 rounded-lg">
-                            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-gray-900 text-sm sm:text-base">{order.customer_name}</h3>
-                            <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-500 mt-1">
-                              <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span>Ordered: {formatDate(order.order_date)}</span>
+             {(showAllAccepted ? acceptedOrders : acceptedOrders.slice(0, ORDERS_TO_SHOW)).map((order: Order, index: number) => {
+                  const originalIndex = orders.findIndex((o) => o._id === order._id)
+                  return (
+                    <div key={order._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 border-l-4 border-l-green-400">
+                      <div className="flex items-center justify-between gap-3">
+                        {/* Left side - Order info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="bg-green-100 p-1.5 rounded">
+                              <CheckCircle className="w-3 h-3 text-green-600" />
                             </div>
+                            <h3 className="font-medium text-gray-900 text-sm truncate">{order.customer_name}</h3>
+                            <span className="text-xs text-gray-500">({formatDate(order.order_date)})</span>
+                            <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-medium">
+                              <CheckCircle className="w-2 h-2" />
+                              Accepted
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 truncate mb-1">{order.product_name} • Qty: {order.quantity} • Size: {order.size}</p>
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                            <MapPin className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">{order.delivery_address}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">Delivery:</span>
+                            <input
+                              type="datetime-local"
+                              value={formatDateForDatetimeInput(order.ETA)}
+                              onChange={(e) => handleChange(originalIndex, "ETA", e.target.value)}
+                              className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
                           </div>
                         </div>
-                        <span className="inline-flex items-center gap-1 sm:gap-2 bg-green-100 text-green-700 px-2 sm:px-4 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium">
-                          <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                          Accepted
-                        </span>
-                      </div>
-
-                      {/* Order Details */}
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-gray-500">
-                          <span>{order.product_name} (Qty: {order.quantity}, Size: {order.size})</span>
+                        
+                        {/* Right side - Actions */}
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            className="inline-flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium transition-colors"
+                          >
+                            <Eye className="w-3 h-3" />
+                            View
+                          </button>
                         </div>
-                        <div className="flex items-start gap-1 text-xs sm:text-sm text-gray-500">
-                          <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0" />
-                          <span className="break-words">{order.delivery_address}</span>
-                        </div>
-                      </div>
-
-                      {/* Delivery Time Input and View Button */}
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-1">
-                          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
-                            <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
-                            <span className="font-medium">Delivery Time:</span>
-                          </div>
-                          <input
-                            type="datetime-local"
-                            value={formatDateForDatetimeInput(order.ETA)}
-                            onChange={(e) => handleChange(originalIndex, "ETA", e.target.value)}
-                            className="border border-gray-300 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-auto"
-                          />
-                        </div>
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="inline-flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors w-full sm:w-auto"
-                        >
-                          <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                          View Details
-                        </button>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+            {acceptedOrders.length > ORDERS_TO_SHOW && (
+                <div className="text-center pt-4">
+                  <button
+                    onClick={() => setShowAllAccepted(!showAllAccepted)}
+                    className="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    {showAllAccepted ? 'Show Less' : `Show More (${acceptedOrders.length - ORDERS_TO_SHOW} more)`}
+                  </button>
+                </div>
+              )}
           </div>
+        </div>
         )}
         
         {/* No Orders State */}
@@ -477,7 +539,8 @@ export default function CustomerOrderDashboard() {
           <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-8 sm:p-12">
             <div className="text-center">
               <Package className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+            
+            <h3 className="font-semibold text-gray-900 text-base sm:text-lg">No orders found</h3>
               <p className="text-sm sm:text-base text-gray-500 mb-4">Orders will appear here when they are placed by customers.</p>
               <button
                 onClick={fetchOrders}
@@ -493,8 +556,9 @@ export default function CustomerOrderDashboard() {
       
       {/* View Order Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white rounded-lg sm:rounded-xl shadow-xl p-4 sm:p-6 w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto">
+       <div onClick={() => setSelectedOrder(null)}  className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div  onClick={(e) => e.stopPropagation()}  className="bg-white rounded-lg sm:rounded-xl shadow-xl p-4 sm:p-6 w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto">
+
             <div className="flex items-center gap-3 mb-4 sm:mb-6">
               <div className="bg-blue-600 p-2 rounded-lg">
                 <Package className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -504,7 +568,7 @@ export default function CustomerOrderDashboard() {
             
             <div className="space-y-3 sm:space-y-4">
               <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
-                <h3 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Product Information</h3>
+                  <h3 className="font-semibold text-gray-900 text-base sm:text-lg">Product Information</h3>
                 <div className="space-y-1">
                   <p className="text-xs sm:text-sm text-gray-600">
                     <strong>Product:</strong> {selectedOrder.product_name}
@@ -520,7 +584,7 @@ export default function CustomerOrderDashboard() {
 
 
               <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
-                <h3 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Customer Information</h3>
+                  <h3 className="font-semibold text-gray-900 text-base sm:text-lg">Customer Information</h3>
                 <div className="space-y-1">
                   <p className="text-xs sm:text-sm text-gray-600">
                     <strong>Customer:</strong> {selectedOrder.customer_name}
@@ -532,7 +596,7 @@ export default function CustomerOrderDashboard() {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
-                <h3 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Order Status</h3>
+                  <h3 className="font-semibold text-gray-900 text-base sm:text-lg">Order Status</h3>
                 <div className="space-y-1">
                   <p className="text-xs sm:text-sm text-gray-600">
                     <strong>Status:</strong> 

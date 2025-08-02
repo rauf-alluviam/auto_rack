@@ -44,7 +44,13 @@ const orderSchema = new mongoose.Schema({
   ETA: {
     type: Date,
     default: null,
-  }
+  },
+//   inventoryId: {
+//   type: mongoose.Schema.Types.ObjectId,
+//   ref: 'Inventory',
+//   required: true,
+// },
+
 });
 
 export const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);

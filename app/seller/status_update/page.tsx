@@ -1,7 +1,7 @@
 "use client"
-
+import { io } from 'socket.io-client';
 import { useEffect, useState } from "react"
-import { Package, RefreshCw, AlertCircle, Search, Filter, Calendar, ClipboardList, History, Home } from "lucide-react"
+import { Package, RefreshCw, AlertCircle, Search, Filter, Calendar, ClipboardList, History, Home ,X} from "lucide-react"
 import { STATUS_OPTIONS, STATUS_CONFIG, StatusBadge } from "@/lib/utils/order-utils" 
 
 interface Order {
@@ -80,6 +80,16 @@ export default function StatusUpdateDashboard() {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("All")
+    const [toast, setToast] = useState<{ message: string; visible: boolean }>({ 
+  message: '', 
+  visible: false 
+});
+
+// Show toast for 3 seconds
+const showToast = (message: string) => {
+  setToast({ message, visible: true });
+  setTimeout(() => setToast({ message: 'New Order Accepted', visible: false }), 3000);
+};
 
   // Fetch orders when component mounts
   useEffect(() => {
@@ -116,35 +126,120 @@ export default function StatusUpdateDashboard() {
     fetchOrders()
   }, [])
 
-  const handleAcceptOrder = async (orderId: string) => {
-    const estimated_delivery = "2025-07-30"
-
-    try {
-      const res = await fetch("/api/sellerOrder/updatestatus", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, estimated_delivery }),
-      })
-
-      const data = await res.json()
-
-      if (res.ok) {
-        alert("Order accepted")
-        
-        const updatedOrders = orders.map((order) =>
-          order._id === orderId
-            ? { ...order, is_accepted: "Accepted", estimated_delivery }
-            : order
-        )
-        setOrders(updatedOrders)
-      } else {
-        alert("Error: " + data.message)
-      }
-    } catch (err) {
-      console.error("Error:", err)
-      alert("Failed to accept order")
-    }
+  // Add this useEffect for real-time updates
+useEffect(() => {
+  // Get seller id from localStorage
+  const seller = typeof window !== 'undefined' ? localStorage.getItem('supplier') : null;
+  
+  if (!seller) {
+    console.log('No seller data found');
+    return;
   }
+
+  let sellerId = '';
+  try {
+    const parsed = JSON.parse(seller);
+    sellerId = parsed._id || parsed.id || '';
+  } catch (e) {
+    console.error('Error parsing seller data:', e);
+    return;
+  }
+
+  if (!sellerId) {
+    console.log('No seller ID found');
+    return;
+  }
+
+  console.log('Connecting socket for seller:', sellerId);
+
+  const socket = io('http://localhost:3000', {
+    path: '/socket.io',
+    transports: ['websocket'],
+  });
+
+  socket.on('connect', () => {
+    console.log('Socket connected (seller status page)', socket.id);
+    socket.emit('register', { userId: sellerId, role: 'seller' });
+  });
+
+  // Listen for new orders
+  socket.on('orderPlaced', (newOrder) => {
+    console.log('New order received on status page:', newOrder);
+    showToast(`New order: ${newOrder.product_name || 'Product'} (Qty: ${newOrder.quantity || 1})`);
+    
+    // Add the new order to the list if it has estimated_delivery
+    if (newOrder.estimated_delivery && newOrder.estimated_delivery.trim() !== '') {
+      setOrders(prevOrders => [newOrder, ...prevOrders]);
+    }
+  });
+
+  // Listen for order updates (when buyers or other sellers update orders)
+  socket.on('orderUpdated', (updatedOrder) => {
+    console.log('Order updated on status page:', updatedOrder);
+    
+    // Update the specific order in the list
+    setOrders(prevOrders => 
+      prevOrders.map(order => 
+        order._id === updatedOrder._id 
+          ? { ...order, ...updatedOrder }
+          : order
+      )
+    );
+
+    // Show toast notification
+    showToast(`Order status updated: ${updatedOrder.is_accepted}`);
+  });
+
+  socket.on('connect_error', (err) => {
+    console.error('Socket connection error (seller status page):', err);
+  });
+
+  return () => {
+    socket.disconnect();
+  };
+}, []); 
+
+
+  
+ const handleAcceptOrder = async (orderId: string) => {
+  const estimated_delivery = "2025-07-30"
+
+  try {
+    const res = await fetch("/api/sellerOrder/updatestatus", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem('token')}` // Add this
+      },
+      body: JSON.stringify({ orderId, estimated_delivery }),
+    })
+
+    const data = await res.json()
+
+    if (res.ok) {
+      // Show success notification
+      showToast("Order accepted successfully!");
+      
+      // Update local state
+      const updatedOrders = orders.map((order) =>
+        order._id === orderId
+          ? { ...order, is_accepted: "Accepted", estimated_delivery }
+          : order
+      )
+      setOrders(updatedOrders)
+      
+      // Note: Socket emission should be handled on the server side
+      // The server should emit 'orderUpdated' event to all connected clients
+      
+    } else {
+      showToast("Error: " + data.message);
+    }
+  } catch (err) {
+    console.error("Error:", err)
+    showToast("Failed to accept order");
+  }
+}
+
 
 
   useEffect(() => {
@@ -169,58 +264,72 @@ export default function StatusUpdateDashboard() {
     }
     setFilteredOrders(filtered)
   }, [searchTerm, statusFilter, orders])
+const handleStatusChange = async (
+  orderId: string,
+  newIsAcceptedStatus: string,
+  newEstimatedDelivery: string | null,
+) => {
+  const orderToUpdate = orders.find((order) => order._id === orderId)
+  if (!orderToUpdate) return
 
-  const handleStatusChange = async (
-    orderId: string,
-    newIsAcceptedStatus: string,
-    newEstimatedDelivery: string | null,
-  ) => {
-    const orderToUpdate = orders.find((order) => order._id === orderId)
-    if (!orderToUpdate) return
-
-    setOrders((prevOrders) =>
-      newIsAcceptedStatus === "Delivered"
-        ? prevOrders.filter((order) => order._id !== orderId)
-        : prevOrders.map((order) =>
-            order._id === orderId
-              ? { ...order, is_accepted: newIsAcceptedStatus, estimated_delivery: newEstimatedDelivery }
-              : order
-          )
-    )
-
-    setUpdatingStatusId(orderId)
-    try {
-      const res = await fetch("/api/sellerOrder/updatestatus", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status: newIsAcceptedStatus, estimated_delivery: newEstimatedDelivery }),
-      })
-      
-      const data = await res.json()
-      
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to update status")
-      }
-      
-      console.log("Status updated successfully:", data)
-    } catch (err) {
-      console.error("Error updating status:", err)
-      setError("Error updating status")
-      
-     
-      setOrders((prevOrders) =>
-        prevOrders.map((order) =>
+  // Optimistic update
+  setOrders((prevOrders) =>
+    newIsAcceptedStatus === "Delivered"
+      ? prevOrders.filter((order) => order._id !== orderId)
+      : prevOrders.map((order) =>
           order._id === orderId
-            ? { ...order, is_accepted: orderToUpdate.is_accepted, estimated_delivery: orderToUpdate.estimated_delivery }
-            : order,
-        ),
-      )
-      
-      alert("Failed to update status. Please try again.")
-    } finally {
-      setUpdatingStatusId(null)
+            ? { ...order, is_accepted: newIsAcceptedStatus, estimated_delivery: newEstimatedDelivery }
+            : order
+        )
+  )
+
+  setUpdatingStatusId(orderId)
+  try {
+    const res = await fetch("/api/sellerOrder/updatestatus", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem('token')}` // Add this
+      },
+      body: JSON.stringify({ 
+        orderId, 
+        status: newIsAcceptedStatus, 
+        estimated_delivery: newEstimatedDelivery 
+      }),
+    })
+    
+    const data = await res.json()
+    
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to update status")
     }
+    
+    console.log("Status updated successfully:", data)
+    
+    // Show success toast
+    showToast(`Status updated to ${newIsAcceptedStatus}`);
+    
+    // Note: Server should emit socket event here
+    
+  } catch (err) {
+    console.error("Error updating status:", err)
+    setError("Error updating status")
+    
+    // Revert optimistic update on error
+    setOrders((prevOrders) =>
+      prevOrders.map((order) =>
+        order._id === orderId
+          ? { ...order, is_accepted: orderToUpdate.is_accepted, estimated_delivery: orderToUpdate.estimated_delivery }
+          : order,
+      ),
+    )
+    
+    showToast("Failed to update status. Please try again.");
+  } finally {
+    setUpdatingStatusId(null)
   }
+}
+
 
   const getStatusStats = () => {
     const stats = STATUS_OPTIONS.reduce(
@@ -290,6 +399,30 @@ export default function StatusUpdateDashboard() {
       <div className="max-w-7xl mx-auto">
         {/* Navigation */}
         <Navigation currentPage="status" />
+        {/* Toast Notification */}
+          {toast.visible && (
+            <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-2 duration-300">
+              <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-300">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                      <Package className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm font-medium">{toast.message}</p>
+                  </div>
+                  <button
+                    onClick={() => setToast({ message: ' New Order Accepted', visible: true })}
+                    className="ml-3 text-white/80 hover:text-white transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
 
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">

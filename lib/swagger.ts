@@ -10,7 +10,7 @@ const options = {
       version: '0.9',
     },
   },
-  apis: ['./app/api/**/*.ts'], // <== include all route files
+  apis: ['./app/api/**/route.ts'], // <== include all route files
 };
 
 export async function getApiDocs() {

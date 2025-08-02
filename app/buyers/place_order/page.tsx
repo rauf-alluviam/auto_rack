@@ -19,6 +19,18 @@ interface Order {
   order_date: string;
   createdAt: string;
 }
+// Helper function outside component
+function getSizeKey(sizeLabel: string) {
+  switch(sizeLabel) {
+    case 'Small Crate': return 'S';
+    case 'Medium Crate': return 'M';
+    case 'Large Crate': return 'L';
+    case 'Extra Large Crate': return 'XL';
+    default: return null;
+  }
+}
+
+
 
 export default function PlaceOrderPage() {
   const router = useRouter();
@@ -30,9 +42,49 @@ export default function PlaceOrderPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
+ const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+ const [stockAvailable, setStockAvailable] = useState<number | null>(null);
+
+useEffect(() => {
+  async function fetchInventory() {
+    try {
+      const res = await fetch('/api/sellerOrder/inventoryManagement');
+      if (!res.ok) throw new Error('Failed to fetch inventory');
+      const data = await res.json();
+      setInventoryItems(data);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  fetchInventory();
+}, []);
+useEffect(() => {
+  async function fetchInventory() {
+    //  fetchInventory code
+  }
+  fetchInventory();
+}, []);
+
+useEffect(() => {
+  if (!size || inventoryItems.length === 0) {
+    setStockAvailable(null);
+    return;
+  }
+
+  const sizeKey = getSizeKey(size);
+  if (!sizeKey) {
+    setStockAvailable(null);
+    return;
+  }
+
+  const product = inventoryItems[0];
+  const available = product?.inventory?.[sizeKey] ?? 0;
+  setStockAvailable(available);
+}, [size, inventoryItems]);
+
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+   const token = localStorage.getItem("buyer_token");
     if (!token) {
       alert("Please log in first.");
       router.push("/signin");
@@ -101,7 +153,7 @@ export default function PlaceOrderPage() {
     console.log("User ID from token:", userId);
 
     try {
-      const token = localStorage.getItem("token");
+     const token = localStorage.getItem("buyer_token");
       console.log("Token exists:", !!token);
       
       if (!token) {
@@ -208,6 +260,16 @@ export default function PlaceOrderPage() {
                   <option value="Large Crate">Large Crate</option>
                   <option value="Extra Large Crate">Extra Large Crate</option>
                 </select>
+                {/* Stock Availability Message */}
+                  {stockAvailable !== null && (
+                    <p className={`mt-2 text-sm ${
+                      stockAvailable > 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {stockAvailable > 0
+                        ? `Stock available: ${stockAvailable}`
+                        : 'Out of stock'}
+                    </p>
+                  )}
               </div>
 
               {/* Quantity */}

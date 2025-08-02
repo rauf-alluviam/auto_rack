@@ -26,6 +26,8 @@
  *                 type: string
  *               password:
  *                 type: string
+ *               confirmPassword:
+ *                 type: string
  *               userType:
  *                 type: string
  *                 enum: [buyer, supplier]
