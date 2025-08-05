@@ -1,7 +1,7 @@
 "use client"
 import { io } from 'socket.io-client';
 import { useEffect, useState } from "react"
-import { Package, RefreshCw, AlertCircle, Search, Filter, Calendar, ClipboardList, History, Home ,X} from "lucide-react"
+import { Package, RefreshCw, AlertCircle, Search, Filter, Calendar, ClipboardList, History, Home ,X,Package2} from "lucide-react"
 import { STATUS_OPTIONS, STATUS_CONFIG, StatusBadge } from "@/lib/utils/order-utils" 
 
 interface Order {
@@ -44,7 +44,13 @@ const Navigation = ({ currentPage }: { currentPage: string }) => {
       href: "/seller/order_history",
       icon: History,
       current: currentPage === "history"
-    }
+    },
+    {
+      name: "Inventory Management",
+      href: "/seller/inventory_management",
+      icon: Package2,
+      current: currentPage === "inventory"
+    },
   ]
 
   return (
@@ -88,7 +94,7 @@ export default function StatusUpdateDashboard() {
 // Show toast for 3 seconds
 const showToast = (message: string) => {
   setToast({ message, visible: true });
-  setTimeout(() => setToast({ message: 'New Order Accepted', visible: false }), 3000);
+  setTimeout(() => setToast({ message: 'New Order', visible: false }), 3000);
 };
 
   // Fetch orders when component mounts
@@ -209,7 +215,7 @@ useEffect(() => {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem('token')}` // Add this
+        "Authorization": `Bearer ${localStorage.getItem('token')}` 
       },
       body: JSON.stringify({ orderId, estimated_delivery }),
     })
@@ -289,7 +295,7 @@ const handleStatusChange = async (
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem('token')}` // Add this
+        "Authorization": `Bearer ${localStorage.getItem('token')}`
       },
       body: JSON.stringify({ 
         orderId, 
@@ -514,6 +520,9 @@ const handleStatusChange = async (
                     Product
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Delivery Address
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -538,6 +547,10 @@ const handleStatusChange = async (
                         <div className="font-medium text-gray-900">{order.product_name}</div>
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{order.customer_name}</div>
+                    </td>
+
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs truncate">{order.delivery_address}</div>
                     </td>

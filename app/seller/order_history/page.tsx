@@ -1,7 +1,7 @@
 "use client"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Package, RefreshCw, AlertCircle, Search, Calendar, Home, History } from "lucide-react"
+import { Package, RefreshCw, AlertCircle, Search, Calendar, Home, History, Package2} from "lucide-react"
 import { formatDate, StatusBadge } from "@/lib/utils/order-utils" 
 
 interface Order {
@@ -45,6 +45,12 @@ const Navigation = ({ currentPage }: { currentPage: string }) => {
       href: "/seller/order_history", 
       icon: History,
       current: currentPage === "history"
+    },
+    {
+      name: "Inventory Management",
+      href: "/seller/inventory_management",
+      icon: Package2,
+      current: currentPage === "inventory"
     }
   ]
 
@@ -278,9 +284,10 @@ export default function OrderHistory() {
                         <div className="font-medium text-gray-900">{order.product_name}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{order.customer_name}</div>
-                    </td>
+                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{order.customer_name}</div>
+                      </td>
+
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs truncate">{order.delivery_address}</div>
                     </td>

@@ -101,11 +101,12 @@ export async function GET(req: NextRequest) {
 
     console.log('Fetching orders for user ID:', userId);
 
-    const orders = await Order.find()
-      // .populate('buyer', 'buyer_id ')
-      .sort({ createdAt: -1 }) 
-      .lean(); 
+         const orders = await Order.find()
+          .populate('buyer', 'name email')  
+          .sort({ createdAt: -1 })
+          .lean();
 
+     
     console.log(`Found ${orders.length} orders for user ${userId}`);
 
     return NextResponse.json({ orders });
@@ -147,7 +148,7 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     console.log('Order update request body:', body);
  
-    const { orderId, estimated_delivery, ETA, status } = body;
+    const { orderId, estimated_delivery, ETA, status,remark } = body;
  
     if (!orderId) {
       return NextResponse.json({
@@ -171,6 +172,11 @@ export async function PUT(req: NextRequest) {
       updateData.is_accepted = status;
       console.log('Setting status:', status);
     }
+    if (remark !== undefined) {
+      updateData.remark = remark; 
+      console.log('Setting remark:', remark);
+    }
+
  
     // Fetch the existing order BEFORE update to get size and quantity
     const existingOrder = await Order.findById(orderId);

@@ -6,6 +6,10 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+    buyerName: {
+    type: String,
+    required: true,
+  },
   quantity: {
     type: Number,
     required: true,
@@ -45,6 +49,11 @@ const orderSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  remark: {
+  type: String,
+  default: '',
+},
+
 //   inventoryId: {
 //   type: mongoose.Schema.Types.ObjectId,
 //   ref: 'Inventory',

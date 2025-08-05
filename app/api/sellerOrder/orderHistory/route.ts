@@ -144,6 +144,7 @@ export async function GET(req: NextRequest) {
         { status: "Delivered" }
       ]
     })
+      .populate("buyer", "name") 
       .sort({ 
         delivery_date: -1,  
         createdAt: -1      

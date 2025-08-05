@@ -1,19 +1,24 @@
 "use client"
 import { io } from 'socket.io-client';
 import { useEffect, useState } from "react"
-import { Package, Calendar, MapPin, CheckCircle, Clock, User, Eye, Home, History,Bell ,X} from "lucide-react"
+import { Package, Calendar, MapPin, CheckCircle, Clock, User, Eye, Home, History,Bell ,X, Package2, Package2Icon} from "lucide-react"
 import { Order } from "@/lib/models/order"
+import { removeAllListeners } from 'process';
 
 interface Order {
   _id: string
   product_name: string
-  customer_name: string
   delivery_address: string
-  ETA: string | null 
+  ETA: string | null
   is_accepted: "Accepted" | "Pending" | "Rejected"
   order_date: string
   quantity: number
   size: string
+  buyer: {
+    name: string
+    email?: string
+  };
+   remark?: string;
 }
 
  
@@ -43,6 +48,12 @@ const Navigation = ({ currentPage }: { currentPage: string }) => {
       href: "/seller/order_history", 
       icon: History,
       current: currentPage === "history"
+    },
+    {
+      name: "Inventory Management",
+      href: "/seller/inventory_management",
+      icon: Package2,
+      current: currentPage === "inventory"
     }
   ]
 
@@ -106,6 +117,14 @@ export default function CustomerOrderDashboard() {
   const [error, setError] = useState("")
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
+
+
+  const [showRemarkBox, setShowRemarkBox] = useState<{ [key: string]: boolean }>({});
+
+const toggleRemarkBox = (orderId: string) => {
+  setShowRemarkBox((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
+};
+
 
   const socket = io("http://localhost:3000", {
   path: "/socket.io",
@@ -221,6 +240,9 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
       const token = localStorage.getItem("token")
       if (!token) throw new Error("No token found")
 
+         const order = orders.find((o) => o._id === orderId)
+        const remark = order?.remark || ""
+
       console.log('Sending update request:', { orderId, estimated_delivery: delivery, status })
 
       const res = await fetch("/api/sellerOrder/customerOrder", {
@@ -232,7 +254,8 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
         body: JSON.stringify({ 
           orderId, 
           estimated_delivery: delivery, 
-          status 
+          status ,
+          remark,
         }),
       })
 
@@ -392,7 +415,7 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
                                 <div className="bg-yellow-100 p-1.5 rounded">
                                   <Clock className="w-3 h-3 text-yellow-600" />
                                 </div>
-                                <h3 className="font-medium text-gray-900 text-sm truncate">{order.customer_name}</h3>
+                               <h3 className="font-medium text-gray-900 text-sm truncate">{order.buyer?.name || "Unknown Buyer"}</h3>
                                 <span className="text-xs text-gray-500">({formatDate(order.order_date)})</span>
                               </div>
                               <p className="text-xs text-gray-600 truncate mb-1">{order.product_name} • Qty: {order.quantity} • Size: {order.size}</p>
@@ -408,8 +431,48 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
                                   className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
                                 />
                               </div>
-                            </div>
-                            
+                           {/* Add Remark Button & Input */}
+                          <div className="mt-2">
+                            <button
+                              onClick={() => toggleRemarkBox(order._id)}
+                              className="text-blue-600 hover:text-blue-800 text-xs font-medium inline-flex items-center gap-1 transition-colors"
+                            >
+                              📝 {showRemarkBox[order._id] ? "Hide Remark" : "Add Remark"}
+                            </button>
+
+                            {showRemarkBox[order._id] && (
+                              <div className="mt-2 bg-gray-50 border border-gray-200 rounded-md p-2">
+                                <textarea
+                                  rows={3}
+                                  placeholder="Write your remark here..."
+                                  value={order.remark || ""}
+                                  onChange={(e) => handleChange(originalIndex, "remark", e.target.value)}
+                                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                                />
+
+                                <div className="flex gap-2 justify-end">
+                                  <button
+                                    onClick={() => {
+                                      handleUpdate(order._id, order.ETA || null, order.is_accepted)
+                                      setShowRemarkBox((prev) => ({ ...prev, [order._id]: false }))
+                                    }}
+                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => setShowRemarkBox((prev) => ({ ...prev, [order._id]: false }))}
+                                    className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          </div>
+
                             {/* Right side - Actions */}
                             <div className="flex flex-col gap-1">
                               <button
@@ -483,7 +546,7 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
                             <div className="bg-green-100 p-1.5 rounded">
                               <CheckCircle className="w-3 h-3 text-green-600" />
                             </div>
-                            <h3 className="font-medium text-gray-900 text-sm truncate">{order.customer_name}</h3>
+                            <h3 className="font-medium text-gray-900 text-sm truncate">{order.buyer?.name || "Unknown Buyer"}</h3>
                             <span className="text-xs text-gray-500">({formatDate(order.order_date)})</span>
                             <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-medium">
                               <CheckCircle className="w-2 h-2" />
@@ -586,9 +649,9 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
               <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
                   <h3 className="font-semibold text-gray-900 text-base sm:text-lg">Customer Information</h3>
                 <div className="space-y-1">
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    <strong>Customer:</strong> {selectedOrder.customer_name}
-                  </p>
+                <p className="text-xs sm:text-sm text-gray-600">
+                <strong>Customer:</strong> {selectedOrder.buyer?.name || "N/A"}
+                </p>
                   <p className="text-xs sm:text-sm text-gray-600 break-words">
                     <strong>Address:</strong> {selectedOrder.delivery_address}
                   </p>

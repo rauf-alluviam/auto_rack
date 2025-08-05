@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     console.log('Order request body:', body)
  
-    const { quantity, size, address, product_name, } = body
+    const { quantity, size, address, product_name,remark } = body
     
     
     const missingFields = []
@@ -196,10 +196,15 @@ export async function POST(req: NextRequest) {
         receivedData: body
       }, { status: 400 })
     }
- 
+    const buyer = await User.findById(buyerId).lean();
+
+if (!buyer) {
+  return NextResponse.json({ error: 'Buyer not found' }, { status: 404 });
+}
+
     const newOrder = await Order.create({
       buyer: buyerId,
-     
+      buyerName: buyer.name,
       quantity: parseInt(quantity),
       size,
       address,
@@ -209,7 +214,8 @@ export async function POST(req: NextRequest) {
       order_date: new Date(),
       is_accepted: 'Pending',
       ETA: null,
-      estimated_delivery: null
+      estimated_delivery: null,
+      remark: remark || '',
     })
  
     console.log('Order created successfully:', newOrder)
@@ -233,83 +239,52 @@ export async function POST(req: NextRequest) {
 }
 
 
-// export async function PUT(req: NextRequest) {
-//   await connectToDB()
- 
-//   const authHeader = req.headers.get('authorization')
-//   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-//     return NextResponse.json({ error: 'Unauthorized - No token provided' }, { status: 401 })
-//   }
- 
-//   const token = authHeader.replace('Bearer ', '')
-//   let decoded: any
-//   try {
-//     decoded = jwt.verify(token, JWT_SECRET)
-//   } catch (error) {
-//     console.error('Token verification failed:', error)
-//     return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
-//   }
- 
-//   const userId = decoded.id
-//   console.log('Updating order for user ID:', userId)
- 
-//   try {
-//     const body = await req.json()
-//     console.log('Order update request body:', body)
- 
-//     const { orderId, ETA, status, estimated_delivery } = body
-    
-   
-//     if (!orderId) {
-//       return NextResponse.json({
-//         error: 'Validation failed',
-//         details: ['orderId is required']
-//       }, { status: 400 })
-//     }
+export async function PUT(req: NextRequest) {
+  await connectToDB();
 
-//     const updateFields: any = {
-//       updated_at: new Date()
-//     }
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Unauthorized - No token provided' }, { status: 401 });
+  }
 
-//     if (ETA) updateFields.ETA = new Date(ETA)
-//     if (estimated_delivery) updateFields.estimated_delivery = new Date(estimated_delivery)
-//     if (status) updateFields.is_accepted = status
+  const token = authHeader.replace('Bearer ', '');
+  let decoded: any;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
+  }
 
-    
-//     const updatedOrder = await Order.findOneAndUpdate(
-//       { _id: orderId, buyer: userId }, 
-//       updateFields,
-//       { new: true, runValidators: true }
-//     )
+  const userId = decoded.id;
 
-//     if (!updatedOrder) {
-//       return NextResponse.json({
-//         error: 'Order not found or you do not have permission to update this order'
-//       }, { status: 404 })
-//     }
- 
-//     console.log('Order updated successfully:', updatedOrder)
-//     return NextResponse.json({ success: true, order: updatedOrder }, { status: 200 })
-//   } catch (error: any) {
-//     console.error('Order update error:', error)
- 
-//     if (error.name === 'ValidationError') {
-//       const validationErrors = Object.values(error.errors).map((err: any) => err.message)
-//       return NextResponse.json({
-//         error: 'Validation failed',
-//         details: validationErrors
-//       }, { status: 400 })
-//     }
+  try {
+    const body = await req.json();
+    const { orderId, ETA, status, remark } = body;
 
-//     if (error.name === 'CastError') {
-//       return NextResponse.json({
-//         error: 'Invalid order ID format'
-//       }, { status: 400 })
-//     }
- 
-//     return NextResponse.json({ 
-//       error: 'Failed to update order',
-//       details: error.message 
-//     }, { status: 500 })
-//   }
-// }
+    if (!orderId) {
+      return NextResponse.json({ error: 'orderId is required' }, { status: 400 });
+    }
+
+    const updateFields: any = {
+      updated_at: new Date()
+    };
+
+    if (ETA) updateFields.ETA = new Date(ETA);
+    if (status) updateFields.is_accepted = status;
+    if (remark !== undefined) updateFields.remark = remark;
+
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: orderId },
+      updateFields,
+      { new: true }
+    );
+
+    if (!updatedOrder) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, order: updatedOrder }, { status: 200 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

@@ -160,6 +160,7 @@ export async function GET(req: NextRequest) {
 
  
     const allOrders = await Order.find()
+      .populate('buyer', 'name')
       .sort({ createdAt: -1 })
       .lean() as OrderDocument[];
 
@@ -216,6 +217,7 @@ export async function GET(req: NextRequest) {
         }
       ]
     })
+      .populate('buyer', 'name')
       .sort({ createdAt: -1 })
       .lean() as OrderDocument[];
 
@@ -233,7 +235,7 @@ export async function GET(req: NextRequest) {
       const transformed = {
         _id: order._id.toString(),
         product_name: order.product_name || order.size || 'Product',
-        customer_name: order.customer_name || order.buyer?.name || 'Customer',
+       customer_name: order.customer_name || order.buyer?.name || 'Customer',
         delivery_address: order.delivery_address || order.address || '',
         estimated_delivery: deliveryDate,
         is_accepted: order.is_accepted || 'Pending',
@@ -425,6 +427,7 @@ export async function POST(req: NextRequest) {
         message: "Failed to update order" 
       }, { status: 500 });
     }
+    await updatedOrder.populate('buyer', 'name');
 
     console.log('Order updated successfully:', {
       orderId: updatedOrder._id,
@@ -440,7 +443,7 @@ export async function POST(req: NextRequest) {
     const responseOrder = {
       _id: updatedOrder._id.toString(),
       product_name: updatedOrder.product_name || updatedOrder.size || 'Product',
-      customer_name: updatedOrder.customer_name || 'Customer',
+      customer_name: updatedOrder.customer_name || updatedOrder.buyer?.name || 'Customer',
       delivery_address: updatedOrder.delivery_address || updatedOrder.address || '',
       ETA: updatedOrder.ETA || '',
       is_accepted: status || updatedOrder.is_accepted, 

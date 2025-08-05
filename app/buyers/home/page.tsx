@@ -33,6 +33,7 @@ interface Order {
   quantity: number
   size: string
   buyer: string
+   remark?: string
 }
 
 interface BuyerData {
@@ -56,9 +57,7 @@ export default function BuyerDashboard() {
   const [token, setToken] = useState<string | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
 
-    
-
-// Toast state for notifications
+  // Toast state for notifications
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: 'Order is Accepted', visible: false });
 
   // Show toast for 3 seconds
@@ -226,7 +225,7 @@ useEffect(() => {
     console.log('Received orderUpdated event (buyer)', update);
 
     // Show toast notification
-    showToast(`Order status updated to ${update.is_accepted}`);
+     showToast(`Order status updated to ${update.is_accepted}`);
     
     // Refresh orders to ensure we have the latest data
     refreshOrders();
@@ -392,7 +391,7 @@ useEffect(() => {
                 <p className="text-sm font-medium">{toast.message}</p>
               </div>
               <button
-                onClick={() => setToast({ message: '', visible: false })}
+                onClick={() => setToast({ message: '', visible: true })}
                 className="ml-3 text-white/80 hover:text-white transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -702,12 +701,13 @@ useEffect(() => {
                             </div>
                           </div>
                           
-                          <span
-                            className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-full self-start sm:self-auto ${getStatusColor(order.is_accepted)}`}
-                          >
-                            {formatStatus(order.is_accepted)}
-                          </span>
-                        </div>
+                        {/* Remark Section */}
+                            {order.remark && (
+                              <div className="mt-2 bg-blue-50 border-l-4 border-blue-400 text-blue-800 px-4 py-2 rounded-md text-sm shadow-sm">
+                                <strong>Seller Remark:</strong> {order.remark}
+                              </div>
+                            )}
+                          </div>
                       </div>
                     ))}
                   </div>
