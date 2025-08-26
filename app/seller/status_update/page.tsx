@@ -1,8 +1,8 @@
 "use client"
 import { io } from 'socket.io-client';
 import { useEffect, useState } from "react"
-import { Package, RefreshCw, AlertCircle, Search, Filter, Calendar, ClipboardList, History, Home ,X,Package2} from "lucide-react"
-import { STATUS_OPTIONS, STATUS_CONFIG, StatusBadge } from "@/lib/utils/order-utils" 
+import { Package, RefreshCw, AlertCircle, Search, Filter, Calendar, History, Home, X, Package2 } from "lucide-react"
+import { STATUS_OPTIONS, STATUS_CONFIG, StatusBadge } from "@/lib/utils/order-utils"
 
 interface Order {
   _id: string
@@ -17,7 +17,6 @@ interface Order {
 interface ApiResponse {
   orders: Order[]
 }
-
 
 const Navigation = ({ currentPage }: { currentPage: string }) => {
   const navItems = [
@@ -54,21 +53,22 @@ const Navigation = ({ currentPage }: { currentPage: string }) => {
   ]
 
   return (
-    <nav className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-      <div className="flex flex-wrap gap-2">
-        {navItems.map((item) => {
+    <nav className="bg-white rounded-xl shadow-md border border-gray-200 p-5 mb-8 sticky top-16 z-40">
+      <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
+        {navItems.map(item => {
           const Icon = item.icon
           return (
             <a
               key={item.name}
               href={item.href}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                item.current
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-300 shadow-sm ${
+                item.current 
+                ? "bg-blue-700 text-white shadow-blue-500/40" 
+                : "bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
               }`}
+              aria-current={item.current ? "page" : undefined}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-5 h-5" />
               {item.name}
             </a>
           )
@@ -79,6 +79,7 @@ const Navigation = ({ currentPage }: { currentPage: string }) => {
 }
 
 export default function StatusUpdateDashboard() {
+  // States
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -86,269 +87,138 @@ export default function StatusUpdateDashboard() {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("All")
-    const [toast, setToast] = useState<{ message: string; visible: boolean }>({ 
-  message: '', 
-  visible: false 
-});
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
 
-// Show toast for 3 seconds
-const showToast = (message: string) => {
-  setToast({ message, visible: true });
-  setTimeout(() => setToast({ message: 'New Order', visible: false }), 3000);
-};
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const ordersPerPage = 10
 
-  // Fetch orders when component mounts
+  // Show toast for 3 seconds
+  const showToast = (message: string) => {
+    setToast({ message, visible: true })
+    setTimeout(() => setToast({ message: '', visible: false }), 3000)
+  }
+
+  // Fetch orders on mount
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setLoading(true)
         setError("")
-        
         const res = await fetch("/api/sellerOrder/updatestatus", {
           method: "GET",
           headers: { 
             "Content-Type": "application/json",
-           "Authorization": `Bearer ${localStorage.getItem('token')}`
-
+            "Authorization": `Bearer ${localStorage.getItem('token')}`
           },
         })
-
         if (!res.ok) {
           throw new Error(`Failed to fetch orders: ${res.status}`)
         }
-
         const data: ApiResponse = await res.json()
-        console.log('Fetched orders:', data.orders)
-        
         setOrders(data.orders || [])
       } catch (err) {
-        console.error("Error fetching orders:", err)
         setError(err instanceof Error ? err.message : "Failed to load orders")
       } finally {
         setLoading(false)
       }
     }
-
     fetchOrders()
   }, [])
 
-  // Add this useEffect for real-time updates
-useEffect(() => {
-  // Get seller id from localStorage
-  const seller = typeof window !== 'undefined' ? localStorage.getItem('supplier') : null;
-  
-  if (!seller) {
-    console.log('No seller data found');
-    return;
-  }
+  // Socket for real-time updates
+  useEffect(() => {
+    const seller = typeof window !== 'undefined' ? localStorage.getItem('supplier') : null;
+    let socket: ReturnType<typeof io> | null = null;
 
-  let sellerId = '';
-  try {
-    const parsed = JSON.parse(seller);
-    sellerId = parsed._id || parsed.id || '';
-  } catch (e) {
-    console.error('Error parsing seller data:', e);
-    return;
-  }
+    if (!seller) return;
 
-  if (!sellerId) {
-    console.log('No seller ID found');
-    return;
-  }
-
-  console.log('Connecting socket for seller:', sellerId);
-
-  const socket = io('http://localhost:3000', {
-    path: '/socket.io',
-    transports: ['websocket'],
-  });
-
-  socket.on('connect', () => {
-    console.log('Socket connected (seller status page)', socket.id);
-    socket.emit('register', { userId: sellerId, role: 'seller' });
-  });
-
-  // Listen for new orders
-  socket.on('orderPlaced', (newOrder) => {
-    console.log('New order received on status page:', newOrder);
-    showToast(`New order: ${newOrder.product_name || 'Product'} (Qty: ${newOrder.quantity || 1})`);
-    
-    // Add the new order to the list if it has estimated_delivery
-    if (newOrder.estimated_delivery && newOrder.estimated_delivery.trim() !== '') {
-      setOrders(prevOrders => [newOrder, ...prevOrders]);
+    let sellerId = '';
+    try {
+      const parsed = JSON.parse(seller);
+      sellerId = parsed._id || parsed.id || '';
+    } catch (e) {
+      return;
     }
-  });
+    if (!sellerId) return;
 
-  // Listen for order updates (when buyers or other sellers update orders)
-  socket.on('orderUpdated', (updatedOrder) => {
-    console.log('Order updated on status page:', updatedOrder);
-    
-    // Update the specific order in the list
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order._id === updatedOrder._id 
-          ? { ...order, ...updatedOrder }
-          : order
-      )
-    );
+    socket = io('http://localhost:3001', {
+      path: '/socket.io',
+      transports: ['websocket'],
+    });
 
-    // Show toast notification
-    showToast(`Order status updated: ${updatedOrder.is_accepted}`);
-  });
+    socket.on('connect', () => {
+      socket!.emit('register', { userId: sellerId, role: 'seller' });
+    });
 
-  socket.on('connect_error', (err) => {
-    console.error('Socket connection error (seller status page):', err);
-  });
+    socket.on('orderPlaced', (newOrder) => {
+      showToast(`New order: ${newOrder.product_name || 'Product'} (Qty: ${newOrder.quantity || 1})`);
+      if (newOrder.estimated_delivery && newOrder.estimated_delivery.trim() !== '') {
+        setOrders(prev => [newOrder, ...prev]);
+      }
+    });
 
-  return () => {
-    socket.disconnect();
-  };
-}, []); 
+    socket.on('orderUpdated', (updatedOrder) => {
+      setOrders(prev =>
+        prev.map(order =>
+          order._id === updatedOrder._id ? { ...order, ...updatedOrder } : order
+        )
+      );
+      showToast(`Order status updated: ${updatedOrder.is_accepted}`);
+    });
 
+    socket.on('connect_error', err => {
+      console.error('Socket connection error:', err);
+    });
 
-  
- const handleAcceptOrder = async (orderId: string) => {
-  const estimated_delivery = "2025-07-30"
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, []);
 
-  try {
-    const res = await fetch("/api/sellerOrder/updatestatus", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem('token')}` 
-      },
-      body: JSON.stringify({ orderId, estimated_delivery }),
-    })
-
-    const data = await res.json()
-
-    if (res.ok) {
-      // Show success notification
-      showToast("Order accepted successfully!");
-      
-      // Update local state
-      const updatedOrders = orders.map((order) =>
-        order._id === orderId
-          ? { ...order, is_accepted: "Accepted", estimated_delivery }
-          : order
-      )
-      setOrders(updatedOrders)
-      
-      // Note: Socket emission should be handled on the server side
-      // The server should emit 'orderUpdated' event to all connected clients
-      
-    } else {
-      showToast("Error: " + data.message);
-    }
-  } catch (err) {
-    console.error("Error:", err)
-    showToast("Failed to accept order");
-  }
-}
-
-
-
+  // Filter orders based on status and search term
   useEffect(() => {
     let filtered = orders.filter(
-      (order) =>
-        order.is_accepted !== "Pending" && 
-        order.is_accepted !== "Delivered" && 
+      order => 
+        order.is_accepted !== "Pending" &&
+        order.is_accepted !== "Delivered" &&
         order.estimated_delivery &&
-        order.estimated_delivery.trim() !== "",
+        order.estimated_delivery.trim() !== ""
     )
 
     if (searchTerm) {
-      filtered = filtered.filter(
-        (order) =>
-          order.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.delivery_address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()),
+      filtered = filtered.filter(order =>
+        order.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.delivery_address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
-    if (statusFilter !== "All") {
-      filtered = filtered.filter((order) => order.is_accepted === statusFilter)
-    }
-    setFilteredOrders(filtered)
-  }, [searchTerm, statusFilter, orders])
-const handleStatusChange = async (
-  orderId: string,
-  newIsAcceptedStatus: string,
-  newEstimatedDelivery: string | null,
-) => {
-  const orderToUpdate = orders.find((order) => order._id === orderId)
-  if (!orderToUpdate) return
 
-  // Optimistic update
-  setOrders((prevOrders) =>
-    newIsAcceptedStatus === "Delivered"
-      ? prevOrders.filter((order) => order._id !== orderId)
-      : prevOrders.map((order) =>
-          order._id === orderId
-            ? { ...order, is_accepted: newIsAcceptedStatus, estimated_delivery: newEstimatedDelivery }
-            : order
-        )
+    if (statusFilter !== "All") {
+      filtered = filtered.filter(order => order.is_accepted === statusFilter)
+    }
+
+    setFilteredOrders(filtered)
+    setCurrentPage(1) // Reset page to 1 each filter/search change
+  }, [searchTerm, statusFilter, orders])
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage)
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * ordersPerPage,
+    currentPage * ordersPerPage
   )
 
-  setUpdatingStatusId(orderId)
-  try {
-    const res = await fetch("/api/sellerOrder/updatestatus", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ 
-        orderId, 
-        status: newIsAcceptedStatus, 
-        estimated_delivery: newEstimatedDelivery 
-      }),
-    })
-    
-    const data = await res.json()
-    
-    if (!res.ok) {
-      throw new Error(data.message || "Failed to update status")
-    }
-    
-    console.log("Status updated successfully:", data)
-    
-    // Show success toast
-    showToast(`Status updated to ${newIsAcceptedStatus}`);
-    
-    // Note: Server should emit socket event here
-    
-  } catch (err) {
-    console.error("Error updating status:", err)
-    setError("Error updating status")
-    
-    // Revert optimistic update on error
-    setOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order._id === orderId
-          ? { ...order, is_accepted: orderToUpdate.is_accepted, estimated_delivery: orderToUpdate.estimated_delivery }
-          : order,
-      ),
-    )
-    
-    showToast("Failed to update status. Please try again.");
-  } finally {
-    setUpdatingStatusId(null)
-  }
-}
-
-
+  // Status stats
   const getStatusStats = () => {
-    const stats = STATUS_OPTIONS.reduce(
-      (acc, status) => {
-        acc[status] = orders.filter((order) => order.is_accepted === status).length
-        return acc
-      },
-      {} as Record<string, number>,
-    )
+    const stats = STATUS_OPTIONS.reduce((acc, status) => {
+      acc[status] = orders.filter(order => order.is_accepted === status).length
+      return acc
+    }, {} as Record<string, number>)
     return stats
   }
 
- 
+  // Refresh orders manually
   const refreshOrders = async () => {
     setLoading(true)
     try {
@@ -356,7 +226,6 @@ const handleStatusChange = async (
         method: "GET",
         headers: { "Content-Type": "application/json" },
       })
-
       if (res.ok) {
         const data: ApiResponse = await res.json()
         setOrders(data.orders || [])
@@ -369,34 +238,77 @@ const handleStatusChange = async (
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading orders...</p>
-        </div>
-      </div>
+  // Status change handler
+  const handleStatusChange = async (
+    orderId: string,
+    newIsAcceptedStatus: string,
+    newEstimatedDelivery: string | null,
+  ) => {
+    const orderToUpdate = orders.find(order => order._id === orderId)
+    if (!orderToUpdate) return
+
+    setOrders(prev =>
+      newIsAcceptedStatus === "Delivered"
+        ? prev.filter(order => order._id !== orderId)
+        : prev.map(order => order._id === orderId ? { ...order, is_accepted: newIsAcceptedStatus, estimated_delivery: newEstimatedDelivery } : order)
     )
+
+    setUpdatingStatusId(orderId)
+    try {
+      const res = await fetch("/api/sellerOrder/updatestatus", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          orderId,
+          status: newIsAcceptedStatus,
+          estimated_delivery: newEstimatedDelivery
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || "Failed to update status")
+      showToast(`Status updated to ${newIsAcceptedStatus}`)
+    } catch (err) {
+      setError("Error updating status")
+      setOrders(prev =>
+        prev.map(order =>
+          order._id === orderId
+            ? { ...order, is_accepted: orderToUpdate.is_accepted, estimated_delivery: orderToUpdate.estimated_delivery }
+            : order,
+        ),
+      )
+      showToast("Failed to update status. Please try again.")
+    } finally {
+      setUpdatingStatusId(null)
+    }
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 text-lg font-medium mb-2">Error Loading Orders</p>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={refreshOrders}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
+  if (loading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="text-center">
+        <RefreshCw className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
+        <p className="text-gray-600 font-semibold">Loading orders...</p>
       </div>
-    )
-  }
+    </div>
+  )
+
+  if (error) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="text-center max-w-md bg-white p-8 rounded-lg shadow-md border border-red-200">
+        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+        <p className="text-red-600 text-xl font-semibold mb-4">Error Loading Orders</p>
+        <p className="text-gray-700 mb-6">{error}</p>
+        <button
+          onClick={refreshOrders}
+          className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-all"
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+  )
 
   const stats = getStatusStats()
 
@@ -406,29 +318,28 @@ const handleStatusChange = async (
         {/* Navigation */}
         <Navigation currentPage="status" />
         {/* Toast Notification */}
-          {toast.visible && (
-            <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-2 duration-300">
-              <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-300">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-                      <Package className="h-4 w-4" />
-                    </div>
+        {toast.visible && (
+          <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-2 duration-300">
+            <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-300">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                    <Package className="h-4 w-4" />
                   </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium">{toast.message}</p>
-                  </div>
-                  <button
-                    onClick={() => setToast({ message: ' New Order Accepted', visible: true })}
-                    className="ml-3 text-white/80 hover:text-white transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
                 </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium">{toast.message}</p>
+                </div>
+                <button
+                  onClick={() => setToast({ message: '', visible: false })}
+                  className="ml-3 text-white/80 hover:text-white transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             </div>
-          )}
-
+          </div>
+        )}
 
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
@@ -537,7 +448,8 @@ const handleStatusChange = async (
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredOrders.map((order, index) => (
+                {/* NOTE: Pagination applied here */}
+                {paginatedOrders.map((order, index) => (
                   <tr key={`${order._id}-${index}`} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
@@ -550,7 +462,6 @@ const handleStatusChange = async (
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{order.customer_name}</div>
                     </td>
-
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs truncate">{order.delivery_address}</div>
                     </td>
@@ -600,13 +511,14 @@ const handleStatusChange = async (
               </tbody>
             </table>
           </div>
-          {filteredOrders.length === 0 && (
-            <div className="text-center py-12">
-              <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+          
+          {paginatedOrders.length === 0 && (
+            <div className="text-center py-20 text-gray-400">
+              <Package className="w-16 h-16 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-1">
                 {searchTerm || statusFilter !== "All" ? "No matching orders" : "No orders found"}
               </h3>
-              <p className="text-gray-500">
+              <p className="max-w-lg mx-auto">
                 {searchTerm || statusFilter !== "All"
                   ? "Try adjusting your search or filter criteria."
                   : "Orders will appear here once they are no longer 'Pending' and have an estimated delivery time set. Orders marked as 'Delivered' are automatically removed from this view."}
@@ -614,6 +526,86 @@ const handleStatusChange = async (
             </div>
           )}
         </div>
+
+       {/* Stylish Pagination Controls */}
+            {totalPages > 1 && (
+              <nav className="flex justify-center items-center gap-3 mt-6 select-none" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-500 disabled:opacity-40"
+                  title="First Page"
+                >
+                  &#171;
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-500 disabled:opacity-40"
+                  title="Previous"
+                >
+                  &#8249;
+                </button>
+
+                {/* Show page numbers: e.g. 1 ... 4 5 [6] 7 8 ... 12 */}
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const page = idx + 1;
+
+                  // show only page numbers around the current page, with optional ellipsis
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`mx-1 px-3 py-1 rounded-full border ${
+                          page === currentPage
+                            ? "bg-blue-600 text-white border-blue-600 shadow font-bold"
+                            : "bg-white text-gray-700 hover:bg-blue-50 border-gray-200"
+                        } transition`}
+                        aria-current={page === currentPage ? "page" : undefined}
+                      >
+                        {page}
+                      </button>
+                    );
+                  }
+
+                  // Ellipsis conditions
+                  if (
+                    (page === currentPage - 2 && currentPage - 3 > 0) ||
+                    (page === currentPage + 2 && currentPage + 3 <= totalPages)
+                  ) {
+                    return (
+                      <span key={page} className="mx-1 px-2 py-1 text-gray-400 select-none">...</span>
+                    );
+                  }
+
+                  // Don't render out-of-range buttons
+                  return null;
+                })}
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-500 disabled:opacity-40"
+                  title="Next"
+                >
+                  &#8250;
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-500 disabled:opacity-40"
+                  title="Last Page"
+                >
+                  &#187;
+                </button>
+              </nav>
+            )}
+
       </div>
     </div>
   )

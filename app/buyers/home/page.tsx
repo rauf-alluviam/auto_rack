@@ -8,7 +8,6 @@ import {
   Clock,
   LogOut,
   Bell,
-  Settings,
   User,
   Search,
   Plus,
@@ -19,8 +18,8 @@ import {
   Menu,
   X,
   ChevronDown,
-  Users
 } from "lucide-react"
+
 
 interface Order {
   _id: string
@@ -33,7 +32,7 @@ interface Order {
   quantity: number
   size: string
   buyer: string
-   remark?: string
+  remark?: string
 }
 
 interface BuyerData {
@@ -44,10 +43,9 @@ interface BuyerData {
   address?: string
 }
 
+
 export default function BuyerDashboard() {
   const [buyerData, setBuyerData] = useState<BuyerData | null>(null)
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
-  const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [selectedFilter, setSelectedFilter] = useState("all")
   const [orders, setOrders] = useState<Order[]>([])
@@ -56,19 +54,22 @@ export default function BuyerDashboard() {
   const [ordersError, setOrdersError] = useState("")
   const [token, setToken] = useState<string | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 8;
 
   // Toast state for notifications
-  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: 'Order is Accepted', visible: false });
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
 
-  // Show toast for 3 seconds
+  // Router
+  const router = useRouter();
+
+  // Utility to show toast for 3 seconds
   const showToast = (message: string) => {
     setToast({ message, visible: true });
     setTimeout(() => setToast({ message: '', visible: false }), 3000);
   };
 
-    
-  const router = useRouter();
-
+  // Token decode helper
   const decodeToken = (token: string) => {
     try {
       const base64Url = token.split('.')[1]
@@ -86,6 +87,7 @@ export default function BuyerDashboard() {
     }
   }
 
+  // Date format helper
   const formatDateForDisplay = (dateString: string | null): string => {
     if (!dateString) return "N/A"
     try {
@@ -97,22 +99,18 @@ export default function BuyerDashboard() {
     }
   }
 
+  // Redirect helpers
   const navigateToSignin = () => {
     window.location.href = "/signin"
   }
-
   const navigateToPlaceOrder = () => {
     window.location.href = "/buyers/place_order"
-  }
-
-  const navigateToProfile = (path: string) => {
-    window.location.href = path
   }
 
   useEffect(() => {
     const checkAuth = () => {
       setLoadingUser(true)
-     const storedToken = localStorage.getItem("buyer_token"); 
+      const storedToken = localStorage.getItem("buyer_token");
       if (!storedToken) {
         console.log("No token found. Redirecting to signin...")
         navigateToSignin()
@@ -166,10 +164,8 @@ export default function BuyerDashboard() {
   useEffect(() => {
     const fetchOrders = async () => {
       if (!buyerData?._id || !token || !authChecked) return
-
       setLoadingOrders(true)
       setOrdersError("")
-
       try {
         const res = await fetch(`/api/orders`, {
           method: "GET",
@@ -187,7 +183,6 @@ export default function BuyerDashboard() {
           }
           throw new Error(`Failed to fetch orders: ${res.status}`)
         }
-
         const data = await res.json()
         setOrders(data.orders || [])
         setOrdersError("")
@@ -204,69 +199,57 @@ export default function BuyerDashboard() {
     }
   }, [buyerData?._id, token, authChecked])
 
+  // Socket for live updates
+  useEffect(() => {
+    if (!buyerData?._id) return;
 
+    const socket = io('http://localhost:3001', {
+      path: '/socket.io',
+      transports: ['websocket'],
+    });
 
+    socket.on('connect', () => {
+      console.log('Socket connected (buyer)', socket.id);
+      socket.emit('register', { userId: buyerData._id, role: 'buyer' });
+    });
 
+    socket.on('orderUpdated', (update) => {
+      console.log('Received orderUpdated event (buyer)', update);
+      showToast(`Order status updated to ${update.is_accepted}`);
+      refreshOrders();
+    });
 
-useEffect(() => {
-  if (!buyerData?._id) return;
-
-  const socket = io('http://localhost:3000', {
-    path: '/socket.io',
-    transports: ['websocket'],
-  });
-
-  socket.on('connect', () => {
-    console.log('Socket connected (buyer)', socket.id);
-    socket.emit('register', { userId: buyerData._id, role: 'buyer' });
-  });
-
-  socket.on('orderUpdated', (update) => {
-    console.log('Received orderUpdated event (buyer)', update);
-
-    // Show toast notification
-     showToast(`Order status updated to ${update.is_accepted}`);
-    
-    // Refresh orders to ensure we have the latest data
-    refreshOrders();
-    
-  });
-
-  // Helper function to refresh orders
-  const refreshOrders = async () => {
-    if (!token) return;
-    
-    try {
-    const buyerToken = localStorage.getItem("buyer_token");
-      const res = await fetch(`/api/orders`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${buyerToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setOrders(data.orders || []);
-        console.log('Orders refreshed after socket update');
+    const refreshOrders = async () => {
+      if (!token) return;
+      try {
+        const buyerToken = localStorage.getItem("buyer_token");
+        const res = await fetch(`/api/orders`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${buyerToken}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setOrders(data.orders || []);
+          console.log('Orders refreshed after socket update');
+        }
+      } catch (error) {
+        console.error("Error refreshing orders:", error);
       }
-    } catch (error) {
-      console.error("Error refreshing orders:", error);
-    }
-  };
+    };
 
-  socket.on('connect_error', (err) => {
-    console.error('Socket connection error (buyer):', err);
-  });
+    socket.on('connect_error', (err) => {
+      console.error('Socket connection error (buyer):', err);
+    });
 
-  return () => {
-    socket.disconnect();
-  };
-}, [buyerData?._id, token]); // Add token to dependencies
+    return () => {
+      socket.disconnect();
+    };
+  }, [buyerData?._id, token]);
 
-
-
+  // Logout handler
   const handleLogout = () => {
     localStorage.clear()
     setBuyerData(null)
@@ -276,6 +259,23 @@ useEffect(() => {
     navigateToSignin()
   }
 
+  // Filter and pagination logic
+  const filteredOrders = orders.filter((order) => {
+    if (selectedFilter === "all") return true
+    return order.is_accepted === selectedFilter
+  })
+
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage)
+  const indexOfLastOrder = currentPage * ordersPerPage
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage
+  const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder)
+
+  // Reset page to 1 on filter change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedFilter])
+
+  // Status badge colors
   const getStatusColor = (status: Order["is_accepted"]) => {
     switch (status) {
       case "Pending":
@@ -301,32 +301,28 @@ useEffect(() => {
 
   const formatStatus = (status: Order["is_accepted"]) => status
 
- 
-
-  // Close mobile menu on window resize
+  // Close mobile menu on resize & click outside handled in your existing code
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) {
         setIsMobileMenuOpen(false)
       }
     }
-    
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Close mobile menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (isMobileMenuOpen && !(event.target as Element).closest('.mobile-menu')) {
         setIsMobileMenuOpen(false)
       }
     }
-
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [isMobileMenuOpen])
 
+  // Loading and error displays 
   if (loadingUser || !authChecked) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -357,7 +353,7 @@ useEffect(() => {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600 text-lg font-medium mb-2">Error Loading Orders</p>
           <p className="text-gray-600 mb-4">{ordersError}</p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
@@ -367,39 +363,28 @@ useEffect(() => {
       </div>
     )
   }
-  
 
-  const filteredOrders = orders.filter((order) => {
-    if (selectedFilter === "all") return true
-    return order.is_accepted === selectedFilter
-  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/20">
 
-      {/* Enhanced Toast Notification */}
-      {toast.visible && (
-        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-2 duration-300">
-          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-300">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-                  <Bell className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="ml-3 flex-1">
-                <p className="text-sm font-medium">{toast.message}</p>
-              </div>
-              <button
-                onClick={() => setToast({ message: '', visible: true })}
-                className="ml-3 text-white/80 hover:text-white transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+      {/* Frosted Classy Toast */}
+    {toast.visible && (
+      <div className="fixed top-8 right-8 z-50 animate-fade-in-up">
+        <div className="bg-white/90 backdrop-blur-md shadow-2xl rounded-2xl px-6 py-4 border-l-4 border-green-400 flex items-center space-x-4">
+          <Bell className="h-6 w-6 text-green-500" />
+          <p className="font-semibold text-gray-800">{toast.message}</p>
+          <button
+            onClick={() => setToast({ message: 'Order is Updated', visible: true })}
+            className="ml-auto"
+            aria-label="Dismiss notification"
+          >
+            <X className="h-5 w-5 text-gray-400 hover:text-gray-700" />
+          </button>
         </div>
-      )}
+      </div>
+    )}
+
 
       {/* Header */}
       <header className="bg-white/90 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
@@ -609,111 +594,161 @@ useEffect(() => {
             )}
 
 
-            {/* Orders List */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-4 sm:p-6 border-b border-gray-200">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Order History</h3>
-                    <p className="text-sm text-gray-600">View and track all your orders</p>
-                  </div>
-                  <div className="relative">
-                    <select
-                      value={selectedFilter}
-                      onChange={(e) => setSelectedFilter(e.target.value)}
-                      className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors w-full sm:w-auto"
-                    >
-                      <option value="all">All Orders</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Accepted">Accepted</option>
-                      <option value="In production">In Production</option>
-                      <option value="Quality Check">Quality Check</option>
-                      <option value="Packaging">Packaging</option>
-                      <option value="Shipped">Shipped</option>
-                      <option value="Delivered">Delivered</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    </div>
+             {/* Orders List */}
+            <section className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 mb-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Order History</h3>
+                  <p className="text-sm text-gray-600">View and track all your orders</p>
+                </div>
+                <div className="relative w-full sm:w-auto">
+                  <select
+                    value={selectedFilter}
+                    onChange={(e) => setSelectedFilter(e.target.value)}
+                    className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors w-full sm:w-auto"
+                    aria-label="Filter orders by status"
+                  >
+                    <option value="all">All Orders</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Accepted">Accepted</option>
+                    <option value="In production">In Production</option>
+                    <option value="Quality Check">Quality Check</option>
+                    <option value="Packaging">Packaging</option>
+                    <option value="Shipped">Shipped</option>
+                    <option value="Delivered">Delivered</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
                   </div>
                 </div>
               </div>
-              
-              <div className="p-4 sm:p-6">
+
+              <div>
                 {filteredOrders.length === 0 ? (
-                  <div className="text-center py-8 sm:py-12">
-                    <Package className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 mb-4">
-                      {orders.length === 0 
-                        ? "You haven't placed any orders yet." 
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 text-gray-400 mx-auto mb-6" />
+                    <p className="text-gray-500 mb-6">
+                      {orders.length === 0
+                        ? "You haven't placed any orders yet."
                         : "No orders found for the selected filter."
                       }
                     </p>
                     {orders.length === 0 && (
                       <button
                         onClick={() => router.push("/buyers/place_order")}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
                       >
                         Place Your First Order
                       </button>
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-4 sm:space-y-6">
-                    {filteredOrders.map((order) => (
+                  <div className="space-y-6">
+                    {currentOrders.map((order) => (
                       <div
                         key={order._id}
-                        className="border border-gray-200 rounded-lg p-4 sm:p-6 hover:shadow-md transition-shadow duration-200"
+                        className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow duration-300"
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-3 sm:space-y-0 mb-4">
-                          <div className="flex-1 space-y-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                              <div className="flex items-center">
-                                <Package className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 mr-2 flex-shrink-0" />
-                                <span className="font-medium text-gray-900 text-sm sm:text-base">
-                                  {order.quantity} x {order.product_name} (Size: {order.size})
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-start">
-                              <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
-                              <span className="text-xs sm:text-sm text-gray-600 break-words">
-                                {order.delivery_address}
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-4 sm:space-y-0 mb-4">
+
+                          <div className="flex-1 space-y-3">
+                            {/* Product & Quantity */}
+                            <div className="flex items-center space-x-3">
+                              <Package className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                              <span className="text-base font-semibold text-gray-900">
+                                {order.quantity} x {order.product_name} (Size: {order.size})
                               </span>
                             </div>
-                            
-                            <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4">
-                              <div className="flex items-center">
-                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 mr-2 flex-shrink-0" />
-                                <span className="text-xs sm:text-sm text-gray-600">
-                                  Ordered: {formatDateForDisplay(order.order_date)}
-                                </span>
+
+                            {/* Delivery Address */}
+                            <div className="flex items-start space-x-3">
+                              <MapPin className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-sm text-gray-600 break-words">{order.delivery_address}</span>
+                            </div>
+
+                            {/* Dates */}
+                            <div className="flex flex-wrap gap-6 text-gray-600 text-sm">
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="h-4 w-4" />
+                                <span>Ordered: {formatDateForDisplay(order.order_date)}</span>
                               </div>
                               {order.estimated_delivery && (
-                                <div className="flex items-center">
-                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 mr-2 flex-shrink-0" />
-                                  <span className="text-xs sm:text-sm text-gray-600">
-                                    ETA: {formatDateForDisplay(order.estimated_delivery)}
-                                  </span>
+                                <div className="flex items-center space-x-1">
+                                  <Clock className="h-4 w-4" />
+                                  <span>ETA: {formatDateForDisplay(order.estimated_delivery)}</span>
                                 </div>
                               )}
                             </div>
-                          </div>
-                          
-                        {/* Remark Section */}
+
+                            {/* Seller Remark */}
                             {order.remark && (
-                              <div className="mt-2 bg-blue-50 border-l-4 border-blue-400 text-blue-800 px-4 py-2 rounded-md text-sm shadow-sm">
-                                <strong>Seller Remark:</strong> {order.remark}
+                              <div className="mt-4 p-4 bg-blue-50 border border-blue-300 rounded-xl shadow-sm text-blue-800 text-sm font-medium italic">
+                                <p><span className="font-semibold">Seller Remark:</span> {order.remark}</p>
                               </div>
                             )}
                           </div>
+
+                          {/* Status Badge */}
+                          <span
+                            className={`px-3 py-1.5 text-sm font-semibold rounded-full self-start sm:self-auto whitespace-nowrap ${getStatusColor(order.is_accepted)}`}
+                          >
+                            {formatStatus(order.is_accepted)}
+                          </span>
+                        </div>
                       </div>
                     ))}
+
+                    {/* Pagination Controls */}
+                    {filteredOrders.length > ordersPerPage && (
+                      <nav className="flex justify-center mt-8 space-x-3" aria-label="Pagination">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className={`rounded-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                            currentPage === 1
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:bg-gray-100"
+                          }`}
+                          aria-disabled={currentPage === 1}
+                          aria-label="Previous page"
+                        >
+                          Previous
+                        </button>
+                        {[...Array(totalPages).keys()].map(num => (
+                          <button
+                            key={num + 1}
+                            onClick={() => setCurrentPage(num + 1)}
+                            className={`rounded-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                              currentPage === num + 1
+                                ? "bg-blue-600 text-white shadow"
+                                : "hover:bg-gray-100"
+                            }`}
+                            aria-current={currentPage === num + 1 ? "page" : undefined}
+                            aria-label={`Page ${num + 1}`}
+                          >
+                            {num + 1}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className={`rounded-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                            currentPage === totalPages
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:bg-gray-100"
+                          }`}
+                          aria-disabled={currentPage === totalPages}
+                          aria-label="Next page"
+                        >
+                          Next
+                        </button>
+                      </nav>
+                    )}
+
                   </div>
                 )}
               </div>
-            </div>
+            </section>
           </div>
         )}
       </main>

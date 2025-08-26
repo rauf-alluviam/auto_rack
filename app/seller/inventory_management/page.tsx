@@ -39,59 +39,58 @@ const sizeMap: Record<string, "S" | "M" | "L" | "XL"> = {
   XL: "XL",
 }
 
-// Navigation Component
 const Navigation = ({ currentPage }: { currentPage: string }) => {
   const navItems = [
     {
       name: "Dashboard",
       href: "/seller",
       icon: Home,
-      current: currentPage === "dashboard"
+      current: currentPage === "dashboard",
     },
     {
       name: "Order Management",
       href: "/seller/customer_order",
-      icon: Package,
-      current: currentPage === "management"
+      icon: Home,
+      current: currentPage === "management",
     },
     {
       name: "Status Updates",
       href: "/seller/status_update",
       icon: Package,
-      current: currentPage === "status"
+      current: currentPage === "status",
     },
     {
       name: "Order History",
       href: "/seller/order_history",
       icon: History,
-      current: currentPage === "history"
+      current: currentPage === "history",
     },
     {
       name: "Inventory Management",
       href: "/seller/inventory_management",
       icon: Package2,
-      current: currentPage === "inventory"
-    }
+      current: currentPage === "inventory",
+    },
   ]
 
   return (
-    <nav className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 mb-4 sm:mb-6">
-      <div className="flex flex-wrap gap-1 sm:gap-2">
+    <nav className="bg-white rounded-xl shadow-md border border-gray-200 p-5 mb-8 sticky top-16 z-40">
+      <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
         {navItems.map((item) => {
           const Icon = item.icon
           return (
             <a
               key={item.name}
               href={item.href}
-              className={`inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
+              className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-300 shadow-sm ${
                 item.current
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  ? "bg-blue-700 text-white shadow-blue-500/40"
+                  : "bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
               }`}
+              aria-current={item.current ? "page" : undefined}
             >
-              <Icon className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">{item.name}</span>
-              <span className="sm:hidden">{item.name.split(' ')[0]}</span>
+              <Icon className="w-5 h-5" />
+              {item.name}
             </a>
           )
         })}
@@ -105,18 +104,19 @@ export default function InventoryManagementPage() {
   const [error, setError] = useState<string | null>(null)
   const [isUpdatingInventory, setIsUpdatingInventory] = useState(false)
   const [isSavingAllChanges, setIsSavingAllChanges] = useState(false)
-  const [inventoryUpdateSuccess, setInventoryUpdateSuccess] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
-  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false })
 
-  // State for managing input values and tracking changes
   const [editingInputs, setEditingInputs] = useState<{ [key: string]: { [size: string]: string } }>({})
   const [originalValues, setOriginalValues] = useState<{ [key: string]: { [size: string]: number } }>({})
+
+  // Max stock value for progress bar width calculation
+  const maxStock = 100
 
   // Show toast for 3 seconds
   const showToast = (message: string) => {
     setToast({ message, visible: true })
-    setTimeout(() => setToast({ message: '', visible: false }), 3000)
+    setTimeout(() => setToast({ message: "", visible: false }), 3000)
   }
 
   useEffect(() => {
@@ -349,10 +349,8 @@ export default function InventoryManagementPage() {
   }
 
   const getStockStatus = (stock: number, threshold = 5) => {
-    if (stock === 0)
-      return { status: "Out of Stock", color: "red" }
-    if (stock <= threshold)
-      return { status: "Low Stock", color: "yellow" }
+    if (stock === 0) return { status: "Out of Stock", color: "red" }
+    if (stock <= threshold) return { status: "Low Stock", color: "yellow" }
     return { status: "In Stock", color: "green" }
   }
 
@@ -418,7 +416,7 @@ export default function InventoryManagementPage() {
                   <p className="text-sm font-medium">{toast.message}</p>
                 </div>
                 <button
-                  onClick={() => setToast({ message: '', visible: false })}
+                  onClick={() => setToast({ message: "", visible: false })}
                   className="ml-3 text-white/80 hover:text-white transition-colors"
                 >
                   <X className="h-4 w-4" />
@@ -477,7 +475,7 @@ export default function InventoryManagementPage() {
                   <div className="text-xs text-orange-700">
                     {pendingChanges.slice(0, 2).map((change, index) => (
                       <div key={index}>
-                        **{change.productName}** - Size {change.size}: {change.oldValue} → {change.newValue}
+                        <strong>{change.productName}</strong> - Size {change.size}: {change.oldValue} → {change.newValue}
                       </div>
                     ))}
                     {pendingChanges.length > 2 && (
@@ -615,13 +613,9 @@ export default function InventoryManagementPage() {
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className={`h-2 rounded-full transition-all ${
-                              stock === 0
-                                ? "bg-red-400"
-                                : stock <= 5
-                                ? "bg-yellow-400"
-                                : "bg-green-400"
+                              stock === 0 ? "bg-red-400" : stock <= 5 ? "bg-yellow-400" : "bg-green-400"
                             }`}
-                            style={{ width: `${Math.max((stock / 20) * 100, 8)}%` }}
+                            style={{ width: `${Math.min((stock / maxStock) * 100, 100)}%` }}
                           ></div>
                         </div>
                       </div>
@@ -631,6 +625,8 @@ export default function InventoryManagementPage() {
                         <input
                           type="text"
                           value={inputValue}
+                          maxLength={6} // Limit input length to 6 characters
+                          style={{ maxWidth: "80px", overflowX: "auto", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                           onChange={(e) => handleInputChange(product.id, size, e.target.value)}
                           className={`w-full px-3 py-2 border rounded-lg text-center font-bold ${
                             hasChanged
@@ -657,9 +653,7 @@ export default function InventoryManagementPage() {
                           >
                             <Minus className="w-3 h-3" />
                           </button>
-                          <div className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-center font-bold">
-                            {stock}
-                          </div>
+                          <div className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-center font-bold">{stock}</div>
                           <button
                             onClick={() => handleStockUpdate(product.id, size as "S" | "M" | "L" | "XL", 1)}
                             className="w-8 h-8 bg-green-100 hover:bg-green-200 text-green-600 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50"
@@ -728,7 +722,7 @@ export default function InventoryManagementPage() {
         {/* Action Buttons */}
         <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-between">
           <button
-            onClick={() => window.location.href = "/seller"}
+            onClick={() => (window.location.href = "/seller")}
             className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
           >
             Back to Dashboard

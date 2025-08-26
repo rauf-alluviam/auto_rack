@@ -1,8 +1,8 @@
 "use client"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Package, RefreshCw, AlertCircle, Search, Calendar, Home, History, Package2} from "lucide-react"
-import { formatDate, StatusBadge } from "@/lib/utils/order-utils" 
+import { Package, RefreshCw, AlertCircle, Search, Calendar, Home, History, Package2 } from "lucide-react"
+import { formatDate, StatusBadge } from "@/lib/utils/order-utils"
 
 interface Order {
   _id: string
@@ -19,7 +19,6 @@ interface ApiResponse {
   orders: Order[]
 }
 
-// Navigation Component
 const Navigation = ({ currentPage }: { currentPage: string }) => {
   const navItems = [
     {
@@ -30,19 +29,19 @@ const Navigation = ({ currentPage }: { currentPage: string }) => {
     },
     {
       name: "Order Management",
-      href: "/seller/customer_order", 
+      href: "/seller/customer_order",
       icon: Home,
       current: currentPage === "management"
     },
     {
       name: "Status Updates",
-      href: "/seller/status_update", 
+      href: "/seller/status_update",
       icon: Package,
       current: currentPage === "status"
     },
     {
       name: "Order History",
-      href: "/seller/order_history", 
+      href: "/seller/order_history",
       icon: History,
       current: currentPage === "history"
     },
@@ -51,25 +50,25 @@ const Navigation = ({ currentPage }: { currentPage: string }) => {
       href: "/seller/inventory_management",
       icon: Package2,
       current: currentPage === "inventory"
-    }
+    },
   ]
 
   return (
-    <nav className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-      <div className="flex flex-wrap gap-2">
-        {navItems.map((item) => {
+    <nav className="bg-white rounded-xl shadow-md border border-gray-200 p-5 mb-8 sticky top-16 z-40">
+      <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
+        {navItems.map(item => {
           const Icon = item.icon
           return (
             <a
               key={item.name}
               href={item.href}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                item.current
-                  ? "bg-green-600 text-white shadow-md"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
+              className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-300 shadow-sm ${item.current
+                  ? "bg-blue-700 text-white shadow-blue-500/40"
+                  : "bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              aria-current={item.current ? "page" : undefined}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-5 h-5" />
               {item.name}
             </a>
           )
@@ -85,15 +84,16 @@ export default function OrderHistory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
-  const router = useRouter()  
+  const [currentPage, setCurrentPage] = useState(1)
+  const ordersPerPage = 10
+  const router = useRouter()
 
+  // Fetch delivered orders on mount
   useEffect(() => {
     const fetchOrders = async () => {
-      const token = localStorage.getItem("token") 
-
+      const token = localStorage.getItem("token")
       if (!token) {
-        console.error("No token found")
-        router.push("/seller") 
+        router.push("/seller")
         return
       }
 
@@ -101,43 +101,48 @@ export default function OrderHistory() {
         const res = await fetch("/api/sellerOrder/orderHistory", {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${token}`, 
+            Authorization: `Bearer ${token}`,
           },
         })
 
         if (!res.ok) {
           const err = await res.json()
-          console.error("Error fetching orders:", err)
+          setError(err?.message || "Failed to fetch orders.")
           return
         }
-
         const data = await res.json()
-        console.log("Fetched orders:", data.orders)
         setOrders(data.orders)
       } catch (err) {
-        console.error("Fetch error:", err)
+        setError("Fetch error")
       } finally {
         setLoading(false)
       }
     }
-
     fetchOrders()
-  }, [])
+  }, [router])
 
+  // Filter by search and delivered status
   useEffect(() => {
-    let filtered = orders.filter((order) => order.status === "Delivered") 
-
+    let filtered = orders.filter(order => order.status === "Delivered")
     if (searchTerm) {
-      filtered = filtered.filter(
-        (order) =>
-          order.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.delivery_address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()),
+      filtered = filtered.filter(order =>
+        order.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.delivery_address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
     setFilteredOrders(filtered)
+    setCurrentPage(1)
   }, [searchTerm, orders])
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage)
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * ordersPerPage,
+    currentPage * ordersPerPage
+  )
+
+  // UI Logic
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -216,19 +221,6 @@ export default function OrderHistory() {
               </div>
             </div>
           </div>
-          {/* <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Items</p>
-                <p className="text-2xl font-bold text-purple-600">
-                  {filteredOrders.reduce((sum, order) => sum + (order.quantity || 0), 0)}
-                </p>
-              </div>
-              <div className="bg-purple-100 p-2 rounded-lg">
-                <Package className="w-5 h-5 text-purple-600" />
-              </div>
-            </div>
-          </div> */}
         </div>
 
         {/* Search */}
@@ -274,7 +266,7 @@ export default function OrderHistory() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredOrders.map((order, index) => (
+                {paginatedOrders.map((order, index) => (
                   <tr key={`${order._id}-${index}`} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
@@ -284,10 +276,9 @@ export default function OrderHistory() {
                         <div className="font-medium text-gray-900">{order.product_name}</div>
                       </div>
                     </td>
-                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.customer_name}</div>
-                      </td>
-
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{order.customer_name}</div>
+                    </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs truncate">{order.delivery_address}</div>
                     </td>
@@ -300,7 +291,9 @@ export default function OrderHistory() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">{formatDate(order.estimated_delivery)}</span>
+                        <span className="text-sm text-gray-900">
+                          {formatDate(order.estimated_delivery)}
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -308,15 +301,88 @@ export default function OrderHistory() {
               </tbody>
             </table>
           </div>
-          {filteredOrders.length === 0 && (
+
+          {/* Pagination controls (modern, pretty) */}
+          {totalPages > 1 && (
+            <nav className="flex justify-center items-center gap-3 mt-6 mb-6 select-none" aria-label="Pagination">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-full bg-gray-100 hover:bg-green-50 text-gray-600 hover:text-green-600 disabled:opacity-40"
+                title="First Page"
+              >
+                &#171;
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-full bg-gray-100 hover:bg-green-50 text-gray-600 hover:text-green-600 disabled:opacity-40"
+                title="Previous"
+              >
+                &#8249;
+              </button>
+              {Array.from({ length: totalPages }).map((_, idx) => {
+                const page = idx + 1;
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`mx-1 px-3 py-1 rounded-full border ${
+                        page === currentPage
+                          ? "bg-green-600 text-white border-green-600 font-bold shadow"
+                          : "bg-white text-gray-700 hover:bg-green-50 border-gray-200"
+                      } transition`}
+                      aria-current={page === currentPage ? "page" : undefined}
+                    >
+                      {page}
+                    </button>
+                  );
+                }
+                // render ellipsis
+                if (
+                  (page === currentPage - 2 && currentPage - 3 > 0) ||
+                  (page === currentPage + 2 && currentPage + 3 <= totalPages)
+                ) {
+                  return (
+                    <span key={page} className="mx-1 px-2 py-1 text-gray-400 select-none">...</span>
+                  );
+                }
+                return null;
+              })}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-full bg-gray-100 hover:bg-green-50 text-gray-600 hover:text-green-600 disabled:opacity-40"
+                title="Next"
+              >
+                &#8250;
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-full bg-gray-100 hover:bg-green-50 text-gray-600 hover:text-green-600 disabled:opacity-40"
+                title="Last Page"
+              >
+                &#187;
+              </button>
+            </nav>
+          )}
+
+          {/* Empty state */}
+          {paginatedOrders.length === 0 && (
             <div className="text-center py-12">
               <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 {searchTerm ? "No matching delivered orders" : "No delivered orders found"}
               </h3>
               <p className="text-gray-500">
-                {searchTerm 
-                  ? "Try adjusting your search criteria." 
+                {searchTerm
+                  ? "Try adjusting your search criteria."
                   : "Delivered orders will appear here once orders are marked as delivered."}
               </p>
             </div>
