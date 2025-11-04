@@ -1,0 +1,63 @@
+{
+  "name": "auto_rack",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "framer-motion": "^12.23.5",
+    "jsonwebtoken": "^9.0.2",
+    "jwt-decode": "^4.0.0",
+    "lucide-react": "^0.525.0",
+    "mongoose": "^8.19.2",
+    "next": "^15.5.6",
+    "next-auth": "^4.24.11",
+    "next-swagger-doc": "^0.4.1",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-icons": "^5.5.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "swagger-ui-react": "^5.27.0",
+    "utils": "^0.2.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.19.9",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.5",
+    "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "ts-node": {
+    "esm": true
+  },
+  "overrides": {
+    "swagger-ui-react": {
+      "react": "^19.0.0",
+      "react-dom": "^19.0.0"
+    }
+  }
+}

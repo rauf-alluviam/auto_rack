@@ -1,0 +1,107 @@
+auto_rack Documentation
+======================
+
+Table of Contents
+-----------------
+1. Overview
+2. UI Documentation
+   - Page Structure
+   - Navigation Flow
+   - Component Descriptions
+   - User Roles & Permissions
+3. API Documentation
+   - Authentication
+   - Orders
+   - User Profile
+   - Seller/Bayer Endpoints
+   - Error Handling & Response Format
+4 . required links
+1. Overview
+-----------
+auto_rack is a web application for managing orders between buyers and sellers, featuring authentication, dashboards.
+
+2. UI Documentation
+-------------------
+
+2.1 Page Structure
+
+Route                        | Description                                 | Access
+---------------------------- | ------------------------------------------- | --------------
+/                            | Redirects to /signin                        | Public
+/signin                      | User login form                             | Public
+/signup                      | User registration form                      | Public
+/dashboard/seller            | Seller dashboard                            | Seller only
+/about                       | About page                                  | Public                  ### SKIP
+/orders                      | Buyer home page                             | Buyer only
+/buyers/profile              | Buyer profile page                          | Buyer only             ### SKIP           
+/buyers/Track_order          | Track order page                            | Buyer only             ### SKIP
+/seller/customer_order       | Seller's customer orders                    | Seller only
+/seller/order_history        | Seller's order history                      | Seller only
+/seller/status_update        | Seller's status update page                 | Seller only
+
+2.2 Navigation Flow
+- Unauthenticated users are redirected to /signin.
+- After login, users are redirected to their respective dashboards based on their role.
+- Navigation bar provides links to accessible pages based on user role.
+- Logout clears session and redirects to /signin.
+
+2.3 Component Descriptions
+- SignInForm: Handles user login, validation, and error display.
+- SignUpForm: Handles user registration, validation, and error display.
+- Dashboard: Displays user-specific data (orders, stats, etc.).
+- OrderList: Lists orders for buyers/sellers.
+- OrderForm: Form for placing or updating orders.
+- Profile: Displays and allows editing of user profile information.
+- StatusBadge: Shows order status with color coding.
+- NavigationBar: Shows links based on user role and authentication.
+
+2.4 User Roles & Permissions
+- Buyer: Can view buyer dashboard, place orders, track orders, and view profile.
+- Seller: Can view seller dashboard, manage customer orders, update order status, and view order history.
+- Unauthorized access: Redirects to /unauthorized.
+
+3. API Documentation
+--------------------
+
+3.1 Authentication
+POST /api/signin
+- Request: { email: string, password: string }
+- Response: { token: string, role: string, user: { ... } }
+- Errors: 401 Invalid credentials, 500 Server error
+
+POST /api/signup
+- Request: { name, email, password, userType, companyName }
+- Response: { message, token, user: { ... } }
+- Errors: 400 Missing fields, 409 Email exists, 500 Server error
+
+3.2 Orders
+POST /api/orders
+- Request: { ...orderData }
+- Response: { success: true, order: { ... } }
+- Errors: 400 All required fields must be filled, 500 Server Error
+
+GET /api/orders?userId={id}
+- Response: { success: true, orders: [ ... ] }
+- Errors: 404/500
+
+3.4 Seller Endpoints
+GET /api/sellerOrder/customerOrder
+- Response: { orders: [ ... ] }
+- Errors: 401/500
+
+GET /api/sellerOrder/orderHistory
+- Response: { orders: [ ... ] }
+- Errors: 401/500
+
+PUT /api/sellerOrder/updatestatus
+- Request: { orderId, status }
+- Response: { success: true }
+- Errors: 400/500
+
+3.5 Error Handling & Response Format
+- All API responses are JSON.
+- On error, response includes { error: string } and appropriate HTTP status code.
+
+4 links 
+- https://autorack.netlify.app/signin :website url
+- https://autorack.netlify.app/api-doc : API url
