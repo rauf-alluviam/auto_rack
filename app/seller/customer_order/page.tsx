@@ -127,9 +127,8 @@ const toggleRemarkBox = (orderId: string) => {
   };
 
 
-  const socket = io("http://localhost:3000", {
+  const socket = io( {
   path: "/socket.io",
-  transports: ["websocket"],
 });
 //  Toast state for notifications
 //   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: 'New Order', visible: false });
@@ -214,8 +213,8 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
       return;
     }
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
-    const socket = io(socketUrl, {
+   
+    const socket = io( {
       path: "/socket.io",
     });
 

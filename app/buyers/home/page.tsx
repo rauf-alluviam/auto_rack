@@ -173,7 +173,7 @@ export default function BuyerDashboard() {
     if (!token || !buyerData?._id) return
 
     // Create socket with explicit URL and options
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+   
       const socket = io({
         path: "/socket.io",
       });

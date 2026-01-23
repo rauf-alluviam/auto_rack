@@ -159,9 +159,8 @@ useEffect(() => {
 
   console.log('Connecting socket for seller:', sellerId);
 
-  const socket = io('http://localhost:3000', {
+  const socket = io( {
     path: '/socket.io',
-    transports: ['websocket'],
   });
 
   socket.on('connect', () => {
