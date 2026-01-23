@@ -125,60 +125,82 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
-import { User } from '@/lib/models/User';
+import User from '@/lib/models/User';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret';
-
-
-const emailRegex = /^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
 
-    
+    // Validation
     if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
-    }
-
-   
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Email and password are required' },
+        { status: 400 }
+      );
     }
 
     await connectToDB();
-    const user = await User.findOne({ email });
 
+    // Find user
+    const user = await User.findOne({ email });
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
+    // Verify password
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
+    // Create JWT
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.userType },
+      {
+        id: user._id,
+        email: user.email,
+        role: user.userType,
+        userType: user.userType,
+      },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
 
-    return NextResponse.json({
-      token,
-      role: user.userType,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        userType: user.userType,
-      }
+    // Response
+    const response = NextResponse.json(
+      {
+        message: 'Login successful',
+        token, // ✅ TOKEN RETURNED (Buyer can store it)
+        user: {
+          id: user._id,
+          name: user.name,
+          companyName: user.companyName,
+          email: user.email,
+          userType: user.userType,
+        },
+      },
+      { status: 200 }
+    );
+
+    // HttpOnly cookie (optional but recommended)
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
     });
 
-  } catch (err) {
-    console.error('Login Error:', err);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return response;
+
+  } catch (error) {
+    console.error('Signin error:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }

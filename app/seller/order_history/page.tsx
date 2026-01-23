@@ -89,7 +89,7 @@ export default function OrderHistory() {
 
   useEffect(() => {
     const fetchOrders = async () => {
-      const token = localStorage.getItem("seller_token") 
+      const token = localStorage.getItem("supplier_token") 
 
       if (!token) {
         console.error("No token found")

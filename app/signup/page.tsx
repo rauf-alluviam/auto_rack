@@ -96,30 +96,35 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         localStorage.setItem("buyer_token", token)
         localStorage.setItem("buyer_id", String(data.user?.id ?? data.user?._id ?? ""))
       } else if (role.toLowerCase() === "seller" || role.toLowerCase() === "supplier") {
-        localStorage.setItem("seller_token", token)
+        localStorage.setItem("supplier_token", token)
         localStorage.setItem("seller_id", String(data.user?.id ?? data.user?._id ?? ""))
       }
 
       // store user info
+
       const userObject = {
         id: data.user?.id ?? data.user?._id ?? "",
         name: data.user?.name ?? name.trim(),
         email: data.user?.email ?? email.trim().toLowerCase(),
         companyName: data.user?.companyName ?? CompanyName.trim(),
-        userType: role
+        userType: role.toLowerCase() // <--- FIX: Force lowercase here
       }
-      localStorage.setItem("auth_user", JSON.stringify(userObject))
-    } else {
+      
+      localStorage.setItem("userData", JSON.stringify(userObject))
+    }else {
       console.warn("No token present in signup response:", data)
     }
 
     setMessage("Account created successfully! Redirecting...")
     // redirect based on role (adjust routes to match your app)
-    if (role.toLowerCase() === "seller") {
-      router.push("/seller/dashboard")
-    } else {
-      router.push("/buyers/home")
-    }
+const normalizedRole = role.toLowerCase();
+
+if (normalizedRole === "seller" || normalizedRole === "supplier") {
+  router.push("/seller/dashboard");
+} else {
+  router.push("/buyers/home");
+}
+
 
   } catch (error: any) {
     console.error("Signup error:", error)

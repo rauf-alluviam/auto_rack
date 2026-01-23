@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Package, Calendar, MapPin, CheckCircle, Clock, User, Eye, Home, History,Bell ,X, Package2, Package2Icon} from "lucide-react"
 import { Order } from "@/lib/models/order"
 import { removeAllListeners } from 'process';
+import toast, { Toaster } from "react-hot-toast";
 
 interface Order {
   _id: string
@@ -117,27 +118,27 @@ export default function CustomerOrderDashboard() {
   const [error, setError] = useState("")
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
-
+  
 
   const [showRemarkBox, setShowRemarkBox] = useState<{ [key: string]: boolean }>({});
 
 const toggleRemarkBox = (orderId: string) => {
-  setShowRemarkBox((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
-};
+    setShowRemarkBox((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
+  };
 
 
-  const socket = io("http://localhost:3001", {
+  const socket = io("http://localhost:3000", {
   path: "/socket.io",
   transports: ["websocket"],
 });
- // Toast state for notifications
-  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+//  Toast state for notifications
+//   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: 'New Order', visible: false });
 
-  // Show toast for 3 seconds
-  const showToast = (message: string) => {
-    setToast({ message, visible: true });
-    setTimeout(() => setToast({ message: '', visible: false }), 3000);
-  };
+//   Show toast for 3 seconds
+//   const showToast = (message: string) => {
+//     setToast({ message, visible: true });
+//     setTimeout(() => setToast({ message: 'New Order', visible: true }), 3000);
+//   };
 
   const [showAllPending, setShowAllPending] = useState<boolean>(false)
 const [showAllAccepted, setShowAllAccepted] = useState<boolean>(false)
@@ -145,16 +146,10 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
   
   const fetchOrders = async () => {
     try {
-      const token = localStorage.getItem("seller_token") 
-      if (!token) {
-        throw new Error("No token found")
-      }
+  const response = await fetch("/api/sellerOrder/customerOrder", {
+  credentials: "include", // 🔑 sends HttpOnly cookie
+})
 
-      const response = await fetch("/api/sellerOrder/customerOrder", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
 
       if (!response.ok) {
         throw new Error("API response not OK")
@@ -193,35 +188,63 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
   };
   
 
-  useEffect(() => {
-    const seller = typeof window !== 'undefined' ? localStorage.getItem('supplier') : null;
-    let sellerId = '';
-    if (seller) {
-      try {
-        const parsed = JSON.parse(seller);
-        sellerId = parsed._id || parsed.id || '';
-      } catch (e) { console.warn('Failed to parse supplier from localStorage', e); }
-    }
-    if (!sellerId) {
-      showToast('Seller ID not found. Real-time updates will not work.');
+ useEffect(() => {
+    // FIX 1: Changed "supplier" to "userData" to match your localStorage
+    const sellerData =
+      typeof window !== "undefined"
+        ? localStorage.getItem("userData")
+        : null;
+
+    if (!sellerData) {
+      toast.error("Seller not logged in. Real-time updates disabled.");
       return;
     }
-    const socket = io({ path: '/socket.io' });
-    socket.on('connect', () => {
-      console.log('Socket connected', socket.id);
-      socket.emit('register', { userId: sellerId, role: 'seller' });
+
+    let sellerId = "";
+    try {
+      const parsed = JSON.parse(sellerData);
+      sellerId = parsed.id || parsed._id;
+    } catch {
+      toast.error("Invalid seller data");
+      return;
+    }
+
+    if (!sellerId) {
+      toast.error("Seller ID missing");
+      return;
+    }
+
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+    const socket = io(socketUrl, {
+      path: "/socket.io",
     });
-    socket.on('orderPlaced', (order) => {
-      console.log('Received orderPlaced event', order);
-      showToast('New order received!');
+
+    socket.on("connect", () => {
+      console.log("✅ Socket connected:", socket.id);
+
+      socket.emit("register", {
+        userId: sellerId,
+        role: "seller",
+      });
+    });
+
+    socket.on("orderPlaced", (order) => {
+      console.log("📦 New order received:", order);
+      toast.success("📦 New order received!");
       fetchOrders();
     });
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err);
-      showToast('Socket connection error');
+
+    socket.on("connect_error", (err) => {
+      console.error("❌ Socket connection error:", err.message);
+      toast.error("Socket connection failed");
     });
-    return () => { socket.disconnect(); };
+
+    return () => {
+      socket.disconnect();
+      console.log("🔌 Socket disconnected");
+    };
   }, []);
+
 
   useEffect(() => {
     // Test toast on every page load
@@ -234,27 +257,32 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
     setOrders(updatedOrders)
   }
 
+   // UPDATED handleUpdate
   const handleUpdate = async (orderId: string, delivery: string | null, status: Order["is_accepted"]) => {
     setLoadingId(orderId)
     try {
-      const token = localStorage.getItem("seller_token")
+      // FIX 2: Changed "seller_token" to "supplier_token" to match your localStorage
+      const token = localStorage.getItem("supplier_token")
       if (!token) throw new Error("No token found")
 
-         const order = orders.find((o) => o._id === orderId)
-        const remark = order?.remark || ""
+      const order = orders.find((o) => o._id === orderId)
+      const remark = order?.remark || ""
 
       console.log('Sending update request:', { orderId, estimated_delivery: delivery, status })
 
       const res = await fetch("/api/sellerOrder/customerOrder", {
-        method: "PUT", 
+        method: "PUT",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, 
+          // Note: You might need to send the token in headers if your API requires it,
+          // since you are fetching it here.
+          // "Authorization": `Bearer ${token}` 
         },
-        body: JSON.stringify({ 
-          orderId, 
-          estimated_delivery: delivery, 
-          status ,
+        body: JSON.stringify({
+          orderId,
+          estimated_delivery: delivery,
+          status,
           remark,
         }),
       })
@@ -263,15 +291,15 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
       console.log('Update response:', result)
       
       if (result.success || res.ok) {
-        alert("Order updated successfully")
+        toast.success("Order updated successfully"); // Using toast instead of alert is better
         await fetchOrders()
       } else {
         console.error('Update failed:', result)
-        alert(`Update failed: ${result.error || 'Unknown error'}`)
+        toast.error(`Update failed: ${result.error || 'Unknown error'}`)
       }
     } catch (err) {
       console.error("Update error:", err)
-      alert("Error while updating")
+      toast.error("Error while updating")
     } finally {
       setLoadingId(null)
     }
@@ -305,28 +333,23 @@ const ORDERS_TO_SHOW: number = 5 // Show 5 orders initially
       <div className="max-w-7xl mx-auto">
         
               {/* Enhanced Toast Notification */}
-              {toast.visible && (
-                <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right-2 duration-300">
-                  <div className="bg-gradient-to-r from-blue-500 to-green-600 text-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-300">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-                          <Bell className="h-4 w-4" />
-                        </div>
-                      </div>
-                      <div className="ml-3 flex-1">
-                        <p className="text-sm font-medium">{toast.message}</p>
-                      </div>
-                      <button
-                        onClick={() => setToast({ message: 'New Order', visible: true })}
-                        className="ml-3 text-white/80 hover:text-white transition-colors"
-                      >
-                         <X className="h-4 w-4" /> 
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+                        <Toaster
+                        position="top-right"
+                        toastOptions={{
+                          style: {
+                            borderRadius: '10px',
+                            background: '#333',
+                            color: '#fff',
+                          },
+                          success: {
+                            iconTheme: {
+                              primary: '#4ade80',
+                              secondary: '#fff',
+                            },
+                          },
+                        }}
+                      />
+
         {/* Navigation */}
         <Navigation currentPage="management" />
 

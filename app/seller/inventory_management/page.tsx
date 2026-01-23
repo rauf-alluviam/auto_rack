@@ -245,35 +245,37 @@ export default function InventoryManagementPage() {
     }
   }
 
-  const getAllChanges = () => {
-    const changes: Array<{
-      productId: string
-      productName: string
-      size: "S" | "M" | "L" | "XL"
-      oldValue: number
-      newValue: number
-    }> = []
+const getAllChanges = () => {
+  const changes: Array<{
+    productId: string
+    productName: string
+    size: "S" | "M" | "L" | "XL"
+    oldValue: number
+    newValue: number
+  }> = []
 
-    Object.entries(editingInputs).forEach(([productId, sizes]) => {
-      const product = products.find((p) => p.id === productId)
-      Object.entries(sizes).forEach(([size, inputValue]) => {
-        const newValue = Number.parseInt(inputValue) || 0
-        const oldValue = originalValues[productId]?.[size] || 0
+  Object.entries(editingInputs).forEach(([productId, sizes]) => {
+    const product = products.find((p) => p.id === productId)
 
-        if (newValue !== oldValue && inputValue !== "") {
-          changes.push({
-            productId,
-            productName: product?.name || "Unknown Product",
-            size: size as "S" | "M" | "L" | "XL",
-            oldValue,
-            newValue,
-          })
-        }
-      })
+    Object.entries(sizes).forEach(([size, inputValue]) => {
+     
+      const newValue = inputValue === "" ? 0 : Number.parseInt(inputValue)
+      const oldValue = originalValues[productId]?.[size] || 0
+      if (newValue !== oldValue) {
+        changes.push({
+          productId,
+          productName: product?.name || "Unknown Product",
+          size: size as "S" | "M" | "L" | "XL",
+          oldValue,
+          newValue,
+        })
+      }
     })
+  })
 
-    return changes
-  }
+  return changes
+}
+
 
   const saveAllChanges = async () => {
     const changes = getAllChanges()
@@ -477,7 +479,7 @@ export default function InventoryManagementPage() {
                   <div className="text-xs text-orange-700">
                     {pendingChanges.slice(0, 2).map((change, index) => (
                       <div key={index}>
-                        **{change.productName}** - Size {change.size}: {change.oldValue} → {change.newValue}
+                         - Size {change.size}: {change.oldValue} → {change.newValue}
                       </div>
                     ))}
                     {pendingChanges.length > 2 && (
@@ -575,9 +577,13 @@ export default function InventoryManagementPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {Object.entries(product.inventory).map(([size, stock]) => {
                   const stockStatus = getStockStatus(stock, 5)
-                  const inputValue = editingInputs[product.id]?.[size] || stock.toString()
+                  const inputValue =
+                  editingInputs[product.id]?.[size] !== undefined
+                    ? editingInputs[product.id]?.[size]
+                    : stock.toString()
                   const originalValue = originalValues[product.id]?.[size] || stock
-                  const hasChanged = inputValue !== originalValue.toString() && inputValue !== ""
+                  const hasChanged = inputValue !== originalValue.toString()
+
 
                   return (
                     <div
@@ -621,31 +627,42 @@ export default function InventoryManagementPage() {
                                 ? "bg-yellow-400"
                                 : "bg-green-400"
                             }`}
-                            style={{ width: `${Math.max((stock / 20) * 100, 8)}%` }}
+                            style={{ width: `${Math.max((stock / 2000) * 100, 8)}%` }}
                           ></div>
                         </div>
                       </div>
 
                       {/* Direct Input */}
-                      <div className="mb-3">
-                        <input
-                          type="text"
-                          value={inputValue}
-                          onChange={(e) => handleInputChange(product.id, size, e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg text-center font-bold ${
-                            hasChanged
-                              ? "border-orange-300 focus:border-orange-500 text-orange-900"
-                              : "border-gray-300 focus:border-blue-500 text-gray-900"
-                          } focus:outline-none focus:ring-1`}
-                          placeholder="Enter stock"
-                          disabled={isSavingAllChanges}
-                        />
-                        {hasChanged && inputValue !== "" && (
-                          <p className="text-xs text-orange-600 mt-1">
-                            Will update: {originalValue} → {inputValue}
-                          </p>
-                        )}
-                      </div>
+
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      value={
+                        editingInputs[product.id]?.[size] !== undefined
+                          ? editingInputs[product.id]?.[size]
+                          : stock.toString()
+                      }
+                      onChange={(e) => handleInputChange(product.id, size, e.target.value)}
+                      onBlur={() => {
+                        if (editingInputs[product.id]?.[size] === "") {
+                          handleInputChange(product.id, size, "0")
+                        }
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg text-center font-bold ${
+                        inputValue !== originalValue.toString()
+                          ? "border-orange-300 focus:border-orange-500 text-orange-900"
+                          : "border-gray-300 focus:border-blue-500 text-gray-900"
+                      } focus:outline-none focus:ring-1`}
+                      placeholder="Enter stock"
+                      disabled={isSavingAllChanges}
+                    />
+                    {inputValue !== originalValue.toString() && (
+                      <p className="text-xs text-orange-600 mt-1">
+                        Will update: {originalValue} → {inputValue === "" ? 0 : inputValue}
+                      </p>
+                    )}
+                  </div>
+
 
                       {/* Stock Controls */}
                       <div className="space-y-2">

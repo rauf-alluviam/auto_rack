@@ -13,7 +13,7 @@ Table of Contents
    - Authentication
    - Orders
    - User Profile
-   - Seller/Bayer Endpoints
+   - Seller/Buyer Endpoints
    - Error Handling & Response Format
 4 . required links
 1. Overview
@@ -70,11 +70,12 @@ POST /api/signin
 - Errors: 401 Invalid credentials, 500 Server error
 
 POST /api/signup
-- Request: { name, email, password, userType, companyName }
+- Request: { name, email, password, confirmpassword, companyName }
 - Response: { message, token, user: { ... } }
 - Errors: 400 Missing fields, 409 Email exists, 500 Server error
 
 3.2 Orders
+
 POST /api/orders
 - Request: { ...orderData }
 - Response: { success: true, order: { ... } }
@@ -87,6 +88,7 @@ GET /api/orders?userId={id}
 3.4 Seller Endpoints
 GET /api/sellerOrder/customerOrder
 - Response: { orders: [ ... ] }
+
 - Errors: 401/500
 
 GET /api/sellerOrder/orderHistory

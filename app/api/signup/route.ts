@@ -65,7 +65,7 @@
  */
 import { NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
-import { User } from '@/lib/models/User';
+import User from '@/lib/models/User'; 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.userType },
       JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '7d' }
     );
 
     return NextResponse.json({

@@ -98,18 +98,19 @@ const showToast = (message: string) => {
 };
 
   // Fetch orders when component mounts
+  // Fetch orders when component mounts
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setLoading(true)
         setError("")
         
+        // ✅ FIX: Changed 'token' to 'supplier_token'
         const res = await fetch("/api/sellerOrder/updatestatus", {
           method: "GET",
           headers: { 
             "Content-Type": "application/json",
-           "Authorization": `Bearer ${localStorage.getItem('token')}`
-
+            "Authorization": `Bearer ${localStorage.getItem('supplier_token')}` 
           },
         })
 
@@ -158,7 +159,7 @@ useEffect(() => {
 
   console.log('Connecting socket for seller:', sellerId);
 
-  const socket = io('http://localhost:3001', {
+  const socket = io('http://localhost:3000', {
     path: '/socket.io',
     transports: ['websocket'],
   });
@@ -211,11 +212,12 @@ useEffect(() => {
   const estimated_delivery = "2025-07-30"
 
   try {
+    // ✅ FIX: Changed 'token' to 'supplier_token'
     const res = await fetch("/api/sellerOrder/updatestatus", {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem('token')}` 
+        "Authorization": `Bearer ${localStorage.getItem('supplier_token')}` 
       },
       body: JSON.stringify({ orderId, estimated_delivery }),
     })
@@ -223,19 +225,14 @@ useEffect(() => {
     const data = await res.json()
 
     if (res.ok) {
-      // Show success notification
       showToast("Order accepted successfully!");
       
-      // Update local state
       const updatedOrders = orders.map((order) =>
         order._id === orderId
           ? { ...order, is_accepted: "Accepted", estimated_delivery }
           : order
       )
       setOrders(updatedOrders)
-      
-      // Note: Socket emission should be handled on the server side
-      // The server should emit 'orderUpdated' event to all connected clients
       
     } else {
       showToast("Error: " + data.message);
@@ -245,6 +242,7 @@ useEffect(() => {
     showToast("Failed to accept order");
   }
 }
+
 
 
 
@@ -295,7 +293,7 @@ const handleStatusChange = async (
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem('seller_token')}`
+        "Authorization": `Bearer ${localStorage.getItem('supplier_token')}`
       },
       body: JSON.stringify({ 
         orderId, 

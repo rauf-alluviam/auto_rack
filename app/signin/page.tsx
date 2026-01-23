@@ -82,46 +82,52 @@ if (!emailRegex.test(emailTrimmed)) {
       }
 const data = await res.json();
 
-let userRole = data.user?.userType?.toLowerCase() || data.user?.role?.toLowerCase();
+/* -------------------------------
+   NORMALIZE API RESPONSE
+-------------------------------- */
+const user = data.user ?? data;   // 👈 buyer fallback
+const token = data.token ?? null;
 
-if (!userRole && data.token) {
-  try {
-    const decoded = jwtDecode<DecodedToken>(data.token);
-    userRole = (decoded.userType || decoded.role)?.toLowerCase();
-  } catch (decodeError) {
-    console.warn("Token decode failed:", decodeError);
-    userRole = "buyer"; 
+/* -------------------------------
+   STORE TOKEN (if exists)
+-------------------------------- */
+
+if (token) {
+  localStorage.setItem("auth_token", token); // universal
+  localStorage.setItem("user_type", user.userType);
+
+  // Optional: role-based token (if needed later)
+  if (user.userType === "supplier") {
+    localStorage.setItem("supplier_token", token);
+  } else {
+    localStorage.setItem("buyer_token", token);
   }
 }
 
-// ✅ Store token based on user role
-if (data.token) {
-  if (userRole === 'supplier' || userRole === 'seller') {
-    localStorage.setItem("seller_token", data.token);
-  } else if (userRole === 'buyer' || !userRole) {
-    localStorage.setItem("buyer_token", data.token);
-  }
-}
+/* -------------------------------
+   STORE USER DATA (ALWAYS)
+-------------------------------- */
+localStorage.setItem(
+  "userData",
+  JSON.stringify({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    userType: user.userType,
+    companyName: user.companyName || "",
+  })
+);
 
-// ✅ Store user object
-const userData = {
-  id: data.user?.id,
-  name: data.user?.name,
-  email: data.user?.email,
-  role: userRole,
-  userType: userRole,
-  address: data.user?.address,
-};
-
-if (userRole === 'supplier' || userRole === 'seller') {
-  localStorage.setItem("supplier", JSON.stringify(userData));
-  router.push("/seller");
-} else if (userRole === 'buyer' || !userRole) {
-  localStorage.setItem("buyer", JSON.stringify(userData));
-  router.push("/buyers/home");
+/* -------------------------------
+   ROLE BASED REDIRECT
+-------------------------------- */
+if (user.userType === "supplier") {
+  window.location.href = "/seller";
 } else {
-  throw new Error(`Unknown user role: ${userRole}`);
+  window.location.href = "/buyers/home";
 }
+
+
 
 
     } catch (error: any) {

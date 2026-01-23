@@ -45,17 +45,43 @@ export default function PlaceOrderPage() {
  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
  const [stockAvailable, setStockAvailable] = useState<number | null>(null);
 
-const fetchInventory = async () => {
-  try {
-    const res = await fetch('/api/sellerOrder/inventoryManagement');
-    if (!res.ok) throw new Error('Failed to fetch inventory');
-    const data = await res.json();
-    setInventoryItems(data);
-  } catch (error) {
-    console.error(error);
-  }
-};
+  // ✅ CORRECTED: fetchInventory with Authorization
+  const fetchInventory = async () => {
+    try {
+      // 1. Get the token
+      const token = localStorage.getItem("buyer_token") || localStorage.getItem("token");
 
+      // 2. Prepare headers
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+
+      // 3. Add Authorization header if token exists
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      // 4. Fetch with headers
+      const res = await fetch('/api/sellerOrder/inventoryManagement', {
+        method: "GET",
+        headers: headers, 
+      });
+
+      if (!res.ok) {
+        // If specifically 401, maybe handle logout?
+        if (res.status === 401) {
+            console.error("Unauthorized access to inventory");
+            // Optional: router.push("/signin");
+        }
+        throw new Error('Failed to fetch inventory');
+      }
+      
+      const data = await res.json();
+      setInventoryItems(data);
+    } catch (error) {
+      console.error("Error fetching inventory:", error);
+    }
+  };
 useEffect(() => {
   fetchInventory();
 }, []);

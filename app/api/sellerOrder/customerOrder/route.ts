@@ -74,187 +74,150 @@
  */
 
 
-import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
-import { connectToDB } from '@/lib/db'
-import { Order } from '@/lib/models/order'
+import { NextRequest, NextResponse } from 'next/server';
+import jwt from 'jsonwebtoken';
+import { connectToDB } from '@/lib/db';
+import { Order } from '@/lib/models/order';
 import { Inventory } from '@/lib/models/inventory';
-import {NextApiRequest, NextApiResponse} from 'next'
+import { cookies } from 'next/headers';
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET!;
 
+/* ========================== GET ORDERS ========================== */
 export async function GET(req: NextRequest) {
   await connectToDB();
-  
+
   try {
-    
-    const authHeader = req.headers.get("authorization");
-    const token = authHeader?.split(" ")[1];
+    /* ===== AUTH (COOKIE) ===== */
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
 
     if (!token) {
-      return NextResponse.json({ message: "Unauthorized - No token provided" }, { status: 401 });
+      return NextResponse.json(
+        { message: 'Unauthorized - No token provided' },
+        { status: 401 }
+      );
     }
 
-    // Verify JWT token
     const decoded: any = jwt.verify(token, JWT_SECRET);
-    const userId = decoded.id; 
+    const userId = decoded.id;
 
     console.log('Fetching orders for user ID:', userId);
 
-         const orders = await Order.find()
-          .populate('buyer', 'name email')  
-          .sort({ createdAt: -1 })
-          .lean();
-
-     
-    console.log(`Found ${orders.length} orders for user ${userId}`);
+    const orders = await Order.find()
+      .populate('buyer', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json({ orders });
   } catch (err: any) {
     console.error('GET orders error:', err);
-    
+
     if (err.name === 'JsonWebTokenError') {
-      return NextResponse.json({ message: "Invalid token" }, { status: 401 });
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
+
     if (err.name === 'TokenExpiredError') {
-      return NextResponse.json({ message: "Token expired" }, { status: 401 });
+      return NextResponse.json({ message: 'Token expired' }, { status: 401 });
     }
-    
-    return NextResponse.json({ message: "Failed to fetch orders", error: err.message }, { status: 500 });
+
+    return NextResponse.json(
+      { message: 'Failed to fetch orders' },
+      { status: 500 }
+    );
   }
 }
 
+/* ========================== UPDATE ORDER ========================== */
 export async function PUT(req: NextRequest) {
   await connectToDB();
- 
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Unauthorized - No token provided' }, { status: 401 });
-  }
- 
-  const token = authHeader.replace('Bearer ', '');
-  let decoded: any;
+
   try {
-    decoded = jwt.verify(token, JWT_SECRET);
-  } catch (error) {
-    console.error('Token verification failed:', error);
-    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
-  }
- 
-  const userId = decoded.id;
-  console.log('Updating order for user ID:', userId);
- 
-  try {
-    const body = await req.json();
-    console.log('Order update request body:', body);
- 
-    const { orderId, estimated_delivery, ETA, status,remark } = body;
- 
-    if (!orderId) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: ['orderId is required']
-      }, { status: 400 });
-    }
- 
-    const updateData: any = {
-      updated_at: new Date()
-    };
- 
-    if (estimated_delivery || ETA) {
-      const deliveryDate = estimated_delivery || ETA;
-      updateData.estimated_delivery = deliveryDate;
-      updateData.ETA = new Date(deliveryDate);
-      console.log('Setting delivery date:', deliveryDate);
-    }
- 
-    if (status) {
-      updateData.is_accepted = status;
-      console.log('Setting status:', status);
-    }
-    if (remark !== undefined) {
-      updateData.remark = remark; 
-      console.log('Setting remark:', remark);
+    /* ===== AUTH (COOKIE) ===== */
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No token provided' },
+        { status: 401 }
+      );
     }
 
- 
-    // Fetch the existing order BEFORE update to get size and quantity
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.id;
+
+    console.log('Updating order for user ID:', userId);
+
+    const body = await req.json();
+    const { orderId, estimated_delivery, ETA, status, remark } = body;
+
+    if (!orderId) {
+      return NextResponse.json(
+        { error: 'orderId is required' },
+        { status: 400 }
+      );
+    }
+
     const existingOrder = await Order.findById(orderId);
     if (!existingOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
- 
-    // Update the order
+
+    const updateData: any = { updated_at: new Date() };
+
+    if (estimated_delivery || ETA) {
+      const deliveryDate = estimated_delivery || ETA;
+      updateData.estimated_delivery = deliveryDate;
+      updateData.ETA = new Date(deliveryDate);
+    }
+
+    if (status) {
+      updateData.is_accepted = status;
+    }
+
+    if (remark !== undefined) {
+      updateData.remark = remark;
+    }
+
     const updatedOrder = await Order.findByIdAndUpdate(
       orderId,
       updateData,
       { new: true, runValidators: true }
     );
- 
-    if (!updatedOrder) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-    }
- 
-   if (status === 'Accepted' && existingOrder.is_accepted !== 'Accepted') {
-  // Convert order size string to inventory size key
-  function getSizeKey(sizeLabel: string) {
-    switch (sizeLabel) {
-      case 'Small Crate': return 'S';
-      case 'Medium Crate': return 'M';
-      case 'Large Crate': return 'L';
-      case 'Extra Large Crate': return 'XL';
-      default: return null;
-    }
-  }
 
-  const sizeKey = getSizeKey(existingOrder.size);
-  if (!sizeKey) {
-    console.warn('Unknown size for inventory update:', existingOrder.size);
-  } else {
-    
-    const inventoryDoc = await Inventory.findOne();
-    if (!inventoryDoc) {
-      console.warn('No inventory document found');
-    } else {
-    
-      // await Inventory.findByIdAndUpdate(
-      //   inventoryDoc._id,
-      //   { $inc: { [`inventory.${sizeKey}`]: -existingOrder.quantity } }
-      // );
-      // console.log(`Inventory updated: decreased ${sizeKey} by ${existingOrder.quantity}`);
-    }
-  }
-}
+    /* ===== INVENTORY UPDATE (ON ACCEPT) ===== */
+    if (status === 'Accepted' && existingOrder.is_accepted !== 'Accepted') {
+      const sizeMap: Record<string, string> = {
+        'Small Crate': 'S',
+        'Medium Crate': 'M',
+        'Large Crate': 'L',
+        'Extra Large Crate': 'XL',
+      };
 
- 
-    console.log('Order updated successfully:', {
-      orderId: updatedOrder._id,
-      is_accepted: updatedOrder.is_accepted,
-      estimated_delivery: updatedOrder.estimated_delivery,
-      ETA: updatedOrder.ETA
-    });
- 
-    return NextResponse.json({ success: true, order: updatedOrder }, { status: 200 });
+      const sizeKey = sizeMap[existingOrder.size];
+      if (sizeKey) {
+        const inventoryDoc = await Inventory.findOne();
+        if (inventoryDoc) {
+          // Inventory logic (optional)
+          // await Inventory.findByIdAndUpdate(
+          //   inventoryDoc._id,
+          //   { $inc: { [`inventory.${sizeKey}`]: -existingOrder.quantity } }
+          // );
+        }
+      }
+    }
+
+    return NextResponse.json(
+      { success: true, order: updatedOrder },
+      { status: 200 }
+    );
   } catch (error: any) {
     console.error('Order update error:', error);
- 
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: validationErrors
-      }, { status: 400 });
-    }
- 
-    if (error.name === 'CastError') {
-      return NextResponse.json({
-        error: 'Invalid order ID format'
-      }, { status: 400 });
-    }
- 
-    return NextResponse.json({
-      error: 'Failed to update order',
-      details: error.message
-    }, { status: 500 });
+
+    return NextResponse.json(
+      { error: 'Failed to update order' },
+      { status: 500 }
+    );
   }
 }

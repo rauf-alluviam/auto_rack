@@ -1,12 +1,13 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
-console.log(" User model loaded");
+import mongoose, { Schema, Document, Model, Types  } from 'mongoose';
 
 export interface IUser extends Document {
+   _id: Types.ObjectId;   
   name: string;
   companyName: string;
   email: string;
   password: string;
   userType: 'buyer' | 'supplier';
+  access_modules?: string[];
 }
 
 const UserSchema = new Schema<IUser>({
@@ -14,9 +15,17 @@ const UserSchema = new Schema<IUser>({
   companyName: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  userType: { type: String, enum: ['buyer', 'supplier'], default: 'buyer', required: true },
+  userType: {
+    type: String,
+    enum: ['buyer', 'supplier'],
+    
+    default: 'buyer',
+    required: true
+  },
+  access_modules: { type: [String], default: [] }
 });
 
-// ✅ This ensures the model is not re-registered in dev mode (prevents MissingSchemaError)
-export const User: Model<IUser> =
+const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+
+export default User;

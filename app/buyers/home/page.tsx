@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation"
 import { io } from "socket.io-client";
 import { jwtDecode } from "jwt-decode";
+import toast, { Toaster } from "react-hot-toast";
 
 import { useState, useEffect, useRef } from "react"
 import {
@@ -66,6 +67,7 @@ export default function BuyerDashboard() {
   const router = useRouter();
 
   // Socket event handlers - defined outside useEffect to avoid stale closures
+
   const handleOrderUpdated = (updatedFields: Partial<Order> & { _id?: string }) => {
     console.log("Order updated received:", updatedFields);
     
@@ -84,12 +86,33 @@ export default function BuyerDashboard() {
             : order
         )
       );
+
+      // ✅ Show toast message about update
+      const status = updatedFields.is_accepted || "Updated";
+      let icon = "🔔";
+      switch (status) {
+        case "Accepted": icon = "✅"; break;
+        case "Rejected": icon = "❌"; break;
+        case "In production": icon = "⚙️"; break;
+        case "Quality Check": icon = "🔍"; break;
+        case "Packaging": icon = "📦"; break;
+        case "Shipped": icon = "🚚"; break;
+        case "Delivered": icon = "🎉"; break;
+      }
+
+      toast(`${updatedFields.product_name || "An order"} status updated to ${status}`, {
+        icon,
+      });
+
     } else {
       // If no _id is provided, refetch all orders
       console.warn("Order update received without _id field. Refetching orders to ensure UI is in sync.");
       fetchOrders();
+
+      // ✅ Optional toast for fallback
+      toast("Order list refreshed to sync latest changes 🔄");
     }
-  }
+  };
 
   const handleOrderPlaced = (newOrder: Order) => {
     console.log("Order placed received:", newOrder)
@@ -105,6 +128,7 @@ export default function BuyerDashboard() {
 
   // Fetch orders function
   const fetchOrders = async () => {
+    // Strict check: must have token to fetch (Backend requirement)
     if (!buyerData?._id || !token || !authChecked) return
 
     setLoadingOrders(true)
@@ -121,7 +145,10 @@ export default function BuyerDashboard() {
 
       if (!res.ok) {
         if (res.status === 401) {
-          localStorage.clear()
+          // Token invalid or expired on server
+          // localStorage.clear()
+          setToken(null)
+          setBuyerData(null)
           navigateToSignin()
           return
         }
@@ -139,17 +166,18 @@ export default function BuyerDashboard() {
       setLoadingOrders(false)
     }
   }
+  
 
   // Socket initialization useEffect
   useEffect(() => {
     if (!token || !buyerData?._id) return
 
     // Create socket with explicit URL and options
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
-    const socket = io(socketUrl, { 
-      path: "/socket.io",
-      transports: ['websocket', 'polling'] // Add fallback transport
-    });
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+      const socket = io({
+        path: "/socket.io",
+      });
+
 
     socketRef.current = socket
 
@@ -182,7 +210,7 @@ export default function BuyerDashboard() {
     }
   }, [token, buyerData?._id])
 
-  // Fetch orders useEffect
+  // Fetch orders useEffect - Triggered once Token and Auth are ready
   useEffect(() => {
     if (authChecked && buyerData && token) {
       fetchOrders()
@@ -192,22 +220,16 @@ export default function BuyerDashboard() {
   // Debug useEffect to check buyer ID and orders
   useEffect(() => {
     console.log("Current buyer ID:", buyerData?._id);
+    console.log("Current token:", token ? "Present" : "Missing");
     console.log("Current orders:", orders);
-    console.log("Orders buyer IDs:", orders.map(o => ({ id: o._id, buyer: o.buyer })));
-  }, [buyerData, orders]);
+  }, [buyerData, orders, token]);
 
   // Utility functions
   const decodeToken = (token: string) => {
     try {
-      const base64Url = token.split('.')[1]
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map((c) => `%${('00' + c.charCodeAt(0).toString(16)).slice(-2)}`)
-          .join('')
-      )
-      return JSON.parse(jsonPayload)
+      // Using jwtDecode library imported above
+      const decoded: any = jwtDecode(token);
+      return decoded;
     } catch (error) {
       console.error('Error decoding token:', error)
       return null
@@ -237,44 +259,86 @@ export default function BuyerDashboard() {
     window.location.href = path
   }
 
-  // Authentication check useEffect
+  // Authentication check useEffect - STRICT MODE
+
   useEffect(() => {
     const checkAuth = () => {
       setLoadingUser(true)
-      const storedToken = localStorage.getItem("buyer_token")
-      if (!storedToken) {
-        console.log("No token found. Redirecting to signin...")
-        navigateToSignin()
-        return
+    
+      const storedToken = localStorage.getItem("buyer_token");
+      const storedUser = localStorage.getItem("userData");
+
+      // 1. Must have user data
+      const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+
+      if (!parsedUser) {
+        console.warn("Auth Fail: No user data found in localStorage.");
+        // FIX: Don't clear ALL storage, just redirect
+        navigateToSignin();
+        return;
       }
- 
-      const decoded: any = decodeToken(storedToken)
+
+      // 2. FIX: Case-Insensitive Check for Buyer
+      // This prevents issues if backend returns "Buyer" vs "buyer"
+      const normalizedUserType = parsedUser.userType?.toLowerCase();
+
+      if (normalizedUserType !== "buyer") {
+        console.warn(`Auth Fail: Expected 'buyer', found '${normalizedUserType}'. Redirecting to signin.`);
+        
+        // CRITICAL FIX: Do NOT clear localStorage.
+        // If a Seller accidentally lands on this page, we shouldn't delete their seller_token.
+        // localStorage.clear(); // <--- REMOVE THIS LINE
+        navigateToSignin();
+        return;
+      }
+
+      // 3. STRICT: Must have Token (Backend Requirement)
+      if (!storedToken) {
+        console.warn("Buyer token missing – Redirecting to login to generate token.");
+        // localStorage.clear(); // <--- REMOVE THIS LINE
+        navigateToSignin();
+        return;
+      }
+
+      // 4. Verify Token Structure and Expiry
+      const decoded: any = decodeToken(storedToken);
+      
       if (!decoded || !decoded.id) {
         console.log("Invalid token structure")
-        localStorage.clear()
+        localStorage.removeItem("buyer_token") // Only remove the specific token
         navigateToSignin()
         return
       }
 
-      if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+      // Check Expiration (if exp exists)
+      // Added a 5-second buffer to prevent "clock drift" errors
+      if (decoded.exp && decoded.exp * 1000 < (Date.now() - 5000)) {
         console.log("Token expired")
-        localStorage.clear()
+        localStorage.removeItem("buyer_token") // Only remove the specific token
         navigateToSignin()
         return
       }
 
-      setToken(storedToken)
+      // 5. Set State
+      setToken(storedToken) 
+
+      let parsedUserData: any = {};
+      try {
+        parsedUserData = storedUser ? JSON.parse(storedUser) : {};
+      } catch {}
 
       const buyerInfo: BuyerData = {
         _id: decoded.id,
-        name: decoded.name || "User",
-        email: decoded.email || "user@example.com",
-      }
+        name: parsedUserData.name || "User",
+        email: parsedUserData.email || decoded.email || "user@example.com",
+        phone: parsedUserData.phone,
+        address: parsedUserData.address,
+      };
 
-      const userData = localStorage.getItem("userData")
-      if (userData) {
+      // Merge additional data from localStorage userData if present
+      if (storedUser) {
         try {
-          const parsedUserData = JSON.parse(userData)
+          const parsedUserData = JSON.parse(storedUser)
           buyerInfo.phone = parsedUserData.phone
           buyerInfo.address = parsedUserData.address
         } catch (parseError) {
@@ -299,7 +363,7 @@ export default function BuyerDashboard() {
       socketRef.current.disconnect()
       socketRef.current = null
     }
-    localStorage.clear()
+    // localStorage.clear()
     setBuyerData(null)
     setToken(null)
     setAuthChecked(false)
@@ -398,26 +462,44 @@ export default function BuyerDashboard() {
     )
   }
 
-const filteredOrders = orders
-  .filter((order) => {
-    if (selectedFilter === "all") return true;
-    return order.is_accepted === selectedFilter;
-  })
-  .filter((order) => {
-    const search = searchQuery.toLowerCase();
+  const filteredOrders = orders
+    .filter((order) => {
+      if (selectedFilter === "all") return true;
+      return order.is_accepted === selectedFilter;
+    })
+    .filter((order) => {
+      const search = searchQuery.toLowerCase();
 
-    return (
-      (order.product_name?.toLowerCase() || "").includes(search) ||
-      (order.size?.toLowerCase() || "").includes(search) ||
-      (order.quantity?.toString() || "").includes(search) ||
-      (order.delivery_address?.toLowerCase() || "").includes(search) 
+      return (
+        (order.product_name?.toLowerCase() || "").includes(search) ||
+        (order.size?.toLowerCase() || "").includes(search) ||
+        (order.quantity?.toString() || "").includes(search) ||
+        (order.delivery_address?.toLowerCase() || "").includes(search) 
 
-    );
-  });
+      );
+    });
 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/20">
+    {/* Local toaster only for this page */}
+              <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                borderRadius: '10px',
+                background: '#333',
+                color: '#fff',
+              },
+              success: {
+                iconTheme: {
+                  primary: '#4ade80',
+                  secondary: '#fff',
+                },
+              },
+            }}
+          />
+
       {/* Header */}
       <header className="bg-white/90 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
@@ -489,6 +571,8 @@ const filteredOrders = orders
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <input
                     placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 pr-4 py-2.5 w-full bg-gray-50/80 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all duration-200 shadow-sm"
                   />
                 </div>
@@ -538,7 +622,7 @@ const filteredOrders = orders
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
-                    Welcome back
+                    Welcome back, {buyerData.name}
                   </h2>
                   <p className="text-sm sm:text-base text-gray-600 truncate">{buyerData.email}</p>
                   {buyerData.phone && (

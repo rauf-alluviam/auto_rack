@@ -120,14 +120,14 @@ export default function BuyerDashboard() {
       const decoded: any = decodeToken(storedToken)
       if (!decoded || !decoded.id) {
         console.log("Invalid token structure")
-        localStorage.clear()
+        // localStorage.clear()
         navigateToSignin()
         return
       }
 
       if (decoded.exp && decoded.exp * 1000 < Date.now()) {
         console.log("Token expired")
-        localStorage.clear()
+        // localStorage.clear()
         navigateToSignin()
         return
       }
@@ -177,7 +177,7 @@ export default function BuyerDashboard() {
 
         if (!res.ok) {
           if (res.status === 401) {
-            localStorage.clear()
+            // localStorage.clear()
             navigateToSignin()
             return
           }
@@ -203,7 +203,7 @@ export default function BuyerDashboard() {
   useEffect(() => {
     if (!buyerData?._id) return;
 
-    const socket = io('http://localhost:3001', {
+    const socket = io('http://localhost:3000', {
       path: '/socket.io',
       transports: ['websocket'],
     });
@@ -251,7 +251,7 @@ export default function BuyerDashboard() {
 
   // Logout handler
   const handleLogout = () => {
-    localStorage.clear()
+    // localStorage.clear()
     setBuyerData(null)
     setToken(null)
     setAuthChecked(false)
